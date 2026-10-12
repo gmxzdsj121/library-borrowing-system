@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 运行数据
+data/*.db
+data/*.db-journal
+logs/*.log
+
+# 报告最终稿单独提交到课程平台，不随代码仓库走
+docs/report/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# 系统
+.DS_Store
+Thumbs.db
