@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS sys_audit_log (
     created_at TEXT    NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_action ON sys_audit_log(action);
+CREATE INDEX IF NOT EXISTS idx_audit_time ON sys_audit_log(created_at);
 
 -- 5. 图书分类表
 CREATE TABLE IF NOT EXISTS book_category (
