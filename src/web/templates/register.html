@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>读者注册 - 图书借阅管理系统</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-box wide">
+  <div class="brand">
+    <h1>读者注册</h1>
+    <p>注册后即可使用图书检索、借阅与预约服务</p>
+  </div>
+
+  <form id="regForm" autocomplete="off">
+    <div class="row2">
+      <div>
+        <label for="username">登录名 / 读者证号</label>
+        <input type="text" id="username" placeholder="4-20 位字母、数字或下划线">
+      </div>
+      <div>
+        <label for="realName">真实姓名</label>
+        <input type="text" id="realName" placeholder="请输入真实姓名" maxlength="20">
+      </div>
+    </div>
+
+    <div class="row2">
+      <div>
+        <label for="phone">手机号（选填）</label>
+        <input type="text" id="phone" placeholder="用于到期提醒" maxlength="11">
+      </div>
+      <div>
+        <label for="readerType">读者类型</label>
+        <select id="readerType">
+          <option value="STUDENT">学生</option>
+          <option value="TEACHER">教师</option>
+        </select>
+      </div>
+    </div>
+
+    <label for="password">口令（至少 8 位，含字母和数字）</label>
+    <input type="password" id="password" placeholder="例如 abc12345" maxlength="32">
+
+    <label for="password2">确认口令</label>
+    <input type="password" id="password2" placeholder="再次输入口令" maxlength="32">
+
+    <div id="msg" class="msg"></div>
+    <button type="submit" id="btnReg">注 册</button>
+  </form>
+
+  <div class="foot-link">已有账号？<a href="/login">返回登录</a></div>
+</div>
+
+<script>
+  const form = document.getElementById('regForm');
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('btnReg');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.className = ok ? 'msg ok' : 'msg error';
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const payload = {
+      username: document.getElementById('username').value.trim(),
+      realName: document.getElementById('realName').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      readerType: document.getElementById('readerType').value,
+      password: document.getElementById('password').value
+    };
+    const pwd2 = document.getElementById('password2').value;
+    if (payload.password !== pwd2) {
+      showMsg('两次输入的口令不一致', false);
+      return;
+    }
+    if (payload.password.length < 8) {
+      showMsg('口令至少 8 位', false);
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await resp.json();
+      if (data.code === 0) {
+        showMsg('注册成功，1 秒后跳转到登录页', true);
+        setTimeout(function () { location.href = '/login'; }, 1000);
+      } else {
+        showMsg(data.msg || '注册失败', false);
+      }
+    } catch (err) {
+      showMsg('网络异常，请稍后再试', false);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
