@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - 图书借阅管理系统</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-box">
+  <div class="brand">
+    <h1>图书借阅管理系统</h1>
+    <p>Library Borrowing Management System · 迭代一</p>
+  </div>
+
+  <form id="loginForm" autocomplete="off">
+    <label for="username">登录名 / 读者证号</label>
+    <input type="text" id="username" name="username" placeholder="请输入登录名" maxlength="20">
+
+    <label for="password">口令</label>
+    <input type="password" id="password" name="password" placeholder="请输入口令" maxlength="32">
+
+    <div id="msg" class="msg"></div>
+
+    <button type="submit" id="btnLogin">登 录</button>
+  </form>
+
+  <div class="foot-link">
+    还没有账号？<a href="/register">读者注册</a>
+  </div>
+  <div class="hint">演示账号：reader01 / reader123456 &nbsp;·&nbsp; libadmin / lib123456</div>
+</div>
+
+<script>
+  // 页面逻辑比较轻，直接写在这里，暂不拆 js 文件
+  const form = document.getElementById('loginForm');
+  const msg = document.getElementById('msg');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.className = ok ? 'msg ok' : 'msg error';
+  }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    if (!username || !password) {
+      showMsg('登录名和口令都要填', false);
+      return;
+    }
+    document.getElementById('btnLogin').disabled = true;
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username, password: password})
+      });
+      const data = await resp.json();
+      if (data.code === 0) {
+        showMsg('登录成功，正在跳转…', true);
+        setTimeout(function () { location.href = '/home'; }, 600);
+      } else {
+        showMsg(data.msg || '登录失败', false);
+      }
+    } catch (err) {
+      showMsg('网络异常，请稍后再试', false);
+    } finally {
+      document.getElementById('btnLogin').disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
