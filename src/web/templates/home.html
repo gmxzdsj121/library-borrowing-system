@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工作台 - 图书借阅管理系统</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="home-page">
+<header class="topbar">
+  <div class="logo">图书借阅管理系统</div>
+  <div class="user-area">
+    <span id="who">加载中…</span>
+    <button id="btnLogout" class="link-btn">退出登录</button>
+  </div>
+</header>
+
+<main class="container">
+  <section class="card">
+    <h2>欢迎回来，<span id="name">—</span></h2>
+    <p class="muted">当前角色：<span id="role">—</span>　账号：<span id="account">—</span></p>
+    <hr>
+    <p>本次迭代（迭代一）已完成用户注册、登录、会话与操作日志模块，作为系统的基础脚手架。</p>
+    <p class="muted">迭代二将开放：图书检索、借阅登记、归还与逾期罚款、预约借书等核心业务功能。</p>
+  </section>
+
+  <section class="card small">
+    <h3>我的快捷入口</h3>
+    <ul class="menu">
+      <li>图书检索 <span class="tag">迭代二</span></li>
+      <li>我的借阅 <span class="tag">迭代二</span></li>
+      <li>预约队列 <span class="tag">迭代二</span></li>
+      <li>罚款缴纳 <span class="tag">迭代二</span></li>
+    </ul>
+  </section>
+</main>
+
+<script>
+  async function loadMe() {
+    const resp = await fetch('/api/auth/me');
+    if (resp.status === 401) {
+      location.href = '/login';
+      return;
+    }
+    const data = await resp.json();
+    if (data.code !== 0) {
+      location.href = '/login';
+      return;
+    }
+    const u = data.data;
+    document.getElementById('who').textContent = u.realName + '（' + u.roleName + '）';
+    document.getElementById('name').textContent = u.realName;
+    document.getElementById('role').textContent = u.roleName;
+    document.getElementById('account').textContent = u.username;
+  }
+
+  document.getElementById('btnLogout').addEventListener('click', async function () {
+    await fetch('/api/auth/logout', {method: 'POST'});
+    location.href = '/login';
+  });
+
+  loadMe();
+</script>
+</body>
+</html>
