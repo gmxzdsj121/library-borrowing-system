@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>图书管理</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">图书与馆藏管理</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <h3>新增书目</h3>
+    <p>ISBN：<input id="isbn"> 书名：<input id="title"> 作者：<input id="author"></p>
+    <p>出版社：<input id="publisher"> 出版年份：<input id="year"> 单价：<input id="price"></p>
+    <button onclick="createBook()">新增</button>
+  </section>
+  <section class="card">
+    <h3>给图书添加复本</h3>
+    <p>图书ID：<input id="bid"> 条码：<input id="code"> 位置：<input id="loc" value="A区"></p>
+    <button onclick="addCopy()">添加复本</button>
+  </section>
+</main>
+<script>
+async function createBook() {
+  const body = {isbn:document.getElementById('isbn').value, title:document.getElementById('title').value,
+    author:document.getElementById('author').value, publisher:document.getElementById('publisher').value,
+    publishYear:+document.getElementById('year').value, price:+document.getElementById('price').value};
+  const r = await fetch('/api/book/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json(); alert(d.msg + (d.code===0?' ID='+d.data.bookId:''));
+}
+async function addCopy() {
+  const body = {bookId:+document.getElementById('bid').value, barcode:document.getElementById('code').value,
+    location:document.getElementById('loc').value};
+  const r = await fetch('/api/book/add-copy', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json(); alert(d.msg);
+}
+</script>
+</body></html>

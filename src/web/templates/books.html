@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>图书检索</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">图书检索</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <input id="kw" placeholder="输入书名 / 作者 / ISBN" style="width:60%;padding:8px">
+    <button onclick="search()">检索</button>
+  </section>
+  <section class="card">
+    <table class="grid">
+      <thead><tr><th>ISBN</th><th>书名</th><th>作者</th><th>出版社</th><th>可借/总</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+</main>
+<script>
+async function search() {
+  const kw = document.getElementById('kw').value;
+  const r = await fetch('/api/book/search?keyword=' + encodeURIComponent(kw));
+  const d = await r.json();
+  const tb = document.getElementById('rows');
+  tb.innerHTML = '';
+  for (const b of d.data.list) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.isbn||'-'}</td><td>${b.title}</td><td>${b.author||'-'}</td>`
+      + `<td>${b.publisher||'-'}</td><td>${b.availableCopies}/${b.totalCopies}</td>`
+      + `<td><a href="/my?reserve=${b.bookId}">预约</a></td>`;
+    tb.appendChild(tr);
+  }
+}
+search();
+</script>
+</body></html>
