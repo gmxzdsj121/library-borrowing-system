@@ -14,9 +14,30 @@ from urllib.parse import urlparse
 
 from src import config
 from src.common import logger
-from src.controller import auth_controller
+from src.controller import auth_controller, book_controller, borrow_controller, reservation_controller
 from src.db.connection import ensure_ready
+from src.service import auth_service
 from src.service.auth_service import AuthError
+
+# 角色权限矩阵：接口前缀 -> 允许的角色；None 表示任意登录用户或匿名
+ROLE_RULES = {
+    "/api/book/search": None,
+    "/api/book/detail": None,
+    "/api/book/categories": None,
+    "/api/book/create": ["LIBRARIAN", "AUDITOR"],
+    "/api/book/add-copy": ["LIBRARIAN", "AUDITOR"],
+    "/api/borrow/borrow": ["LIBRARIAN"],
+    "/api/borrow/return": ["LIBRARIAN"],
+    "/api/borrow/renew": ["READER"],
+    "/api/borrow/my": ["READER"],
+    "/api/fine/list": None,
+    "/api/fine/pay": ["LIBRARIAN", "AUDITOR"],
+    "/api/fine/waive": ["AUDITOR"],
+    "/api/reserve/reserve": ["READER"],
+    "/api/reserve/cancel": ["READER"],
+    "/api/reserve/my": ["READER"],
+    "/api/reserve/queue": None,
+}
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
@@ -27,6 +48,12 @@ PAGES = {
     "/login": "login.html",
     "/register": "register.html",
     "/home": "home.html",
+    "/books": "books.html",
+    "/my": "my.html",
+    "/admin/borrow": "admin_borrow.html",
+    "/admin/return": "admin_return.html",
+    "/admin/books": "admin_books.html",
+    "/admin/fines": "admin_fines.html",
 }
 
 MAX_BODY = 64 * 1024
@@ -123,6 +150,42 @@ class LibraryHandler(BaseHTTPRequestHandler):
             if path == "/api/auth/logout" and method == "POST":
                 return self._handle_logout()
 
+            # ---- 迭代二：图书 / 借阅 / 预约 接口 ----
+            if path == "/api/book/search" and method == "GET":
+                return self._handle_book_search()
+            if path == "/api/book/detail" and method == "GET":
+                return self._handle_book_detail()
+            if path == "/api/book/categories" and method == "GET":
+                return self._json(200, book_controller.handle_categories())
+            if path == "/api/book/create" and method == "POST":
+                return self._handle_book_create()
+            if path == "/api/book/add-copy" and method == "POST":
+                return self._handle_book_add_copy()
+
+            if path == "/api/borrow/borrow" and method == "POST":
+                return self._handle_borrow()
+            if path == "/api/borrow/return" and method == "POST":
+                return self._handle_return()
+            if path == "/api/borrow/renew" and method == "POST":
+                return self._handle_renew()
+            if path == "/api/borrow/my" and method == "GET":
+                return self._handle_my_borrows()
+            if path == "/api/fine/list" and method == "GET":
+                return self._handle_fine_list()
+            if path == "/api/fine/pay" and method == "POST":
+                return self._handle_fine_pay()
+            if path == "/api/fine/waive" and method == "POST":
+                return self._handle_fine_waive()
+
+            if path == "/api/reserve/reserve" and method == "POST":
+                return self._handle_reserve()
+            if path == "/api/reserve/cancel" and method == "POST":
+                return self._handle_reserve_cancel()
+            if path == "/api/reserve/my" and method == "GET":
+                return self._handle_my_reservations()
+            if path == "/api/reserve/queue" and method == "GET":
+                return self._json(200, reservation_controller.handle_book_queue(self._query()))
+
             if path.startswith("/api/"):
                 return self._json(404, {"code": 404, "msg": "接口不存在", "data": None})
             return self._json(404, {"code": 404, "msg": "页面不存在", "data": None})
@@ -159,6 +222,23 @@ class LibraryHandler(BaseHTTPRequestHandler):
     def _ip(self):
         return self.client_address[0]
 
+    def _query(self):
+        from urllib.parse import parse_qs
+        raw = urlparse(self.path).query
+        return {k: v[0] for k, v in parse_qs(raw).items()}
+
+    def _current_user(self):
+        return auth_service.current_user(self._cookie("sid"))
+
+    def _require(self, roles):
+        """权限校验：roles=None 表示需要登录；列表表示必须是其中之一。"""
+        user = self._current_user()
+        if user is None:
+            raise AuthError("请先登录", 401)
+        if roles and user["role"] not in roles:
+            raise AuthError("没有操作权限", 403)
+        return user
+
     def _handle_register(self):
         payload = self._read_body()
         result = auth_controller.handle_register(payload, self._ip())
@@ -181,6 +261,79 @@ class LibraryHandler(BaseHTTPRequestHandler):
         result = auth_controller.handle_me(self._cookie("sid"))
         status = 200 if result["code"] == 0 else 401
         self._json(status, result)
+
+    # ---- 图书 ----
+    def _handle_book_search(self):
+        user = self._current_user()  # 检索允许匿名
+        result = book_controller.handle_search(self._query(), user)
+        self._json(200, result)
+
+    def _handle_book_detail(self):
+        result = book_controller.handle_detail(self._query().get("bookId"))
+        self._json(200, result)
+
+    def _handle_book_create(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        result = book_controller.handle_create(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_book_add_copy(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        result = book_controller.handle_add_copy(self._read_body(), user)
+        self._json(200, result)
+
+    # ---- 借阅 / 归还 / 续借 ----
+    def _handle_borrow(self):
+        user = self._require(["LIBRARIAN"])
+        result = borrow_controller.handle_borrow(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_return(self):
+        user = self._require(["LIBRARIAN"])
+        result = borrow_controller.handle_return(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_renew(self):
+        user = self._require(["READER"])
+        result = borrow_controller.handle_renew(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_my_borrows(self):
+        user = self._require(["READER"])
+        result = borrow_controller.handle_my_borrows(user)
+        self._json(200, result)
+
+    # ---- 罚款 ----
+    def _handle_fine_list(self):
+        user = self._require(None)
+        result = borrow_controller.handle_fine_list(self._query(), user)
+        self._json(200, result)
+
+    def _handle_fine_pay(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        result = borrow_controller.handle_fine_pay(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_fine_waive(self):
+        user = self._require(["AUDITOR"])
+        result = borrow_controller.handle_fine_waive(self._read_body(), user)
+        self._json(200, result)
+
+    # ---- 预约 ----
+    def _handle_reserve(self):
+        user = self._require(["READER"])
+        result = reservation_controller.handle_reserve(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_reserve_cancel(self):
+        user = self._require(["READER"])
+        result = reservation_controller.handle_cancel(self._read_body(), user)
+        self._json(200, result)
+
+    def _handle_my_reservations(self):
+        user = self._require(["READER"])
+        result = reservation_controller.handle_my_reservations(user)
+        self._json(200, result)
 
 
 def make_server(port=8000, host="127.0.0.1"):
