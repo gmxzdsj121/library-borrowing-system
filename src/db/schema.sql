@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS book (
     status           TEXT    NOT NULL DEFAULT 'ON_SHELF'
                      CHECK (status IN ('ON_SHELF','OFF_SHELF')),
     created_at       TEXT    NOT NULL,
+    updated_at       TEXT    NOT NULL,
     FOREIGN KEY (category_id) REFERENCES book_category(category_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_book_isbn ON book(isbn);
