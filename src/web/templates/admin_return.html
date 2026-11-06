@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>归还处理</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">归还处理（馆员）</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <p>复本条码：<input id="barcode" placeholder="例如 BC1001">
+    <button onclick="doReturn()">办理归还</button></p>
+  </section>
+</main>
+<script>
+async function doReturn() {
+  const r = await fetch('/api/borrow/return', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({barcode: document.getElementById('barcode').value})});
+  const d = await r.json();
+  alert(d.msg);
+}
+</script>
+</body></html>

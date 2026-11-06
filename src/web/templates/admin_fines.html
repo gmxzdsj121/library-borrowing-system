@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>罚款管理</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">罚款管理</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <button onclick="load()">刷新</button>
+    <table class="grid">
+      <thead><tr><th>罚款ID</th><th>读者ID</th><th>逾期天数</th><th>金额</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+</main>
+<script>
+let role = '';
+async function load() {
+  const me = await (await fetch('/api/auth/me')).json();
+  role = me.data ? me.data.role : '';
+  const r = await fetch('/api/fine/list?all=1');
+  const d = await r.json();
+  const tb = document.getElementById('rows');
+  tb.innerHTML = '';
+  d.data.forEach(f => {
+    let op = '-';
+    if (f.status === 'UNPAID') {
+      op = `<button onclick="pay(${f.fine_id})">缴纳</button>`;
+      if (role === 'AUDITOR') op += ` <button onclick="waive(${f.fine_id})">减免</button>`;
+    }
+    tb.insertAdjacentHTML('beforeend',
+      `<tr><td>${f.fine_id}</td><td>${f.reader_id}</td><td>${f.overdue_days}</td><td>${f.amount}</td><td>${f.status}</td><td>${op}</td></tr>`);
+  });
+}
+async function pay(id) {
+  const r = await fetch('/api/fine/pay', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fineId:id})});
+  const d = await r.json(); alert(d.msg); if (d.code===0) load();
+}
+async function waive(id) {
+  const r = await fetch('/api/fine/waive', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fineId:id})});
+  const d = await r.json(); alert(d.msg); if (d.code===0) load();
+}
+load();
+</script>
+</body></html>

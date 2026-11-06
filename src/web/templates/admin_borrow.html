@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>借阅登记</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">借阅登记（馆员）</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <p>读者用户ID：<input id="readerId" placeholder="读者的 user_id">
+    复本条码：<input id="barcode" placeholder="例如 BC1001">
+    <button onclick="borrow()">办理借书</button></p>
+  </section>
+</main>
+<script>
+async function borrow() {
+  const r = await fetch('/api/borrow/borrow', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({readerId: +document.getElementById('readerId').value,
+                          barcode: document.getElementById('barcode').value})});
+  const d = await r.json();
+  alert(d.msg + (d.code===0 ? '，应还：' + d.data.dueAt : ''));
+}
+</script>
+</body></html>
