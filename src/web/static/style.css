@@ -144,3 +144,18 @@ hr { border: none; border-top: 1px dashed #e0e7ed; margin: 14px 0; }
   background: #fdf3da;
   border-radius: 3px;
 }
+
+/* 迭代二：列表表格 */
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.grid th, .grid td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e0e7ed;
+  text-align: left;
+}
+.grid th { background: #f2f7f5; color: #1f6f5c; }
+.grid button { padding: 3px 10px; font-size: 12px; }
+

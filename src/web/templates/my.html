@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><title>我的借阅</title>
+<link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<header class="topbar"><div class="logo">我的借阅</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card" id="sec-borrows">
+    <h3>借阅记录</h3>
+    <table class="grid"><thead><tr><th>记录ID</th><th>借出时间</th><th>应还</th><th>状态</th><th>续借次数</th><th>操作</th></tr></thead>
+    <tbody id="borrows"></tbody></table>
+  </section>
+  <section class="card" id="sec-fines">
+    <h3>我的罚款</h3>
+    <table class="grid"><thead><tr><th>罚款ID</th><th>逾期天数</th><th>金额</th><th>状态</th></tr></thead>
+    <tbody id="fines"></tbody></table>
+  </section>
+  <section class="card" id="sec-reserve">
+    <h3>我的预约</h3>
+    <table class="grid"><thead><tr><th>预约ID</th><th>图书ID</th><th>排队号</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody id="reserves"></tbody></table>
+  </section>
+</main>
+<script>
+async function load() {
+  const u = await (await fetch('/api/auth/me')).json();
+  if (u.code !== 0) { location.href = '/login'; return; }
+  const bs = await (await fetch('/api/borrow/my')).json();
+  const tb = document.getElementById('borrows');
+  bs.data.forEach(b => {
+    const canRenew = b.status === 'BORROWED' && b.renewCount < 2;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${b.recordId}</td><td>${b.borrowAt}</td><td>${b.dueAt}</td><td>${b.status}</td><td>${b.renewCount}</td>`
+      + `<td>${canRenew ? `<button onclick="renew(${b.recordId})">续借</button>` : '-'}</td>`;
+    tb.appendChild(tr);
+  });
+  const fs = await (await fetch('/api/fine/list')).json();
+  const ft = document.getElementById('fines');
+  fs.data.forEach(f => ft.insertAdjacentHTML('beforeend',
+    `<tr><td>${f.fine_id}</td><td>${f.overdue_days}</td><td>${f.amount}</td><td>${f.status}</td></tr>`));
+  const rs = await (await fetch('/api/reserve/my')).json();
+  const rt = document.getElementById('reserves');
+  rs.data.forEach(r => {
+    const can = r.status === 'QUEUING' || r.status === 'READY';
+    rt.insertAdjacentHTML('beforeend',
+      `<tr><td>${r.reservation_id}</td><td>${r.book_id}</td><td>${r.queue_no}</td><td>${r.status}</td>`
+      + `<td>${can ? `<button onclick="cancel(${r.reservation_id})">取消</button>` : '-'}</td></tr>`);
+  });
+}
+async function renew(id) {
+  const r = await fetch('/api/borrow/renew', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({recordId: id})});
+  const d = await r.json();
+  alert(d.msg); if (d.code===0) location.reload();
+}
+async function cancel(id) {
+  const r = await fetch('/api/reserve/cancel', {method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({reservationId: id})});
+  const d = await r.json();
+  alert(d.msg); if (d.code===0) location.reload();
+}
+load();
+</script>
+</body></html>

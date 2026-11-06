@@ -20,38 +20,58 @@
     <h2>欢迎回来，<span id="name">—</span></h2>
     <p class="muted">当前角色：<span id="role">—</span>　账号：<span id="account">—</span></p>
     <hr>
-    <p>本次迭代（迭代一）已完成用户注册、登录、会话与操作日志模块，作为系统的基础脚手架。</p>
-    <p class="muted">迭代二将开放：图书检索、借阅登记、归还与逾期罚款、预约借书等核心业务功能。</p>
+    <p>当前迭代为<strong>迭代二</strong>，已开放图书检索、借阅登记、归还与逾期罚款、续借、预约借书等核心业务功能。</p>
   </section>
 
-  <section class="card small">
-    <h3>我的快捷入口</h3>
+  <!-- 按角色显示不同的功能入口 -->
+  <section class="card small" id="menuReader" style="display:none">
+    <h3>读者功能</h3>
     <ul class="menu">
-      <li>图书检索 <span class="tag">迭代二</span></li>
-      <li>我的借阅 <span class="tag">迭代二</span></li>
-      <li>预约队列 <span class="tag">迭代二</span></li>
-      <li>罚款缴纳 <span class="tag">迭代二</span></li>
+      <li><a href="/books">图书检索</a></li>
+      <li><a href="/my">我的借阅 / 续借</a></li>
+      <li><a href="/my#fines">我的罚款</a></li>
+      <li><a href="/my#reserve">我的预约</a></li>
+    </ul>
+  </section>
+
+  <section class="card small" id="menuLibrarian" style="display:none">
+    <h3>图书馆管理员功能</h3>
+    <ul class="menu">
+      <li><a href="/admin/books">图书与馆藏管理</a></li>
+      <li><a href="/admin/borrow">借阅登记</a></li>
+      <li><a href="/admin/return">归还处理</a></li>
+      <li><a href="/admin/fines">罚款收取</a></li>
+    </ul>
+  </section>
+
+  <section class="card small" id="menuAuditor" style="display:none">
+    <h3>审核统计管理员功能</h3>
+    <ul class="menu">
+      <li><a href="/admin/fines">罚款减免审批</a></li>
+      <li>借阅统计报表 <span class="tag">迭代三</span></li>
+      <li>账号审核与权限 <span class="tag">迭代三</span></li>
+      <li>公告发布 <span class="tag">迭代三</span></li>
     </ul>
   </section>
 </main>
 
 <script>
+  let currentRole = '';
   async function loadMe() {
     const resp = await fetch('/api/auth/me');
-    if (resp.status === 401) {
-      location.href = '/login';
-      return;
-    }
+    if (resp.status === 401) { location.href = '/login'; return; }
     const data = await resp.json();
-    if (data.code !== 0) {
-      location.href = '/login';
-      return;
-    }
+    if (data.code !== 0) { location.href = '/login'; return; }
     const u = data.data;
+    currentRole = u.role;
     document.getElementById('who').textContent = u.realName + '（' + u.roleName + '）';
     document.getElementById('name').textContent = u.realName;
     document.getElementById('role').textContent = u.roleName;
     document.getElementById('account').textContent = u.username;
+    // 根据角色显示对应菜单
+    document.getElementById('menuReader').style.display = u.role === 'READER' ? 'block' : 'none';
+    document.getElementById('menuLibrarian').style.display = u.role === 'LIBRARIAN' ? 'block' : 'none';
+    document.getElementById('menuAuditor').style.display = u.role === 'AUDITOR' ? 'block' : 'none';
   }
 
   document.getElementById('btnLogout').addEventListener('click', async function () {
