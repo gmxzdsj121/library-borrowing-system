@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>统计报表 - 图书借阅管理系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<h2>借阅统计报表</h2>
+<div class="grid">
+    <div class="card"><h3>馆藏概况</h3>
+        <p>图书总数：<span id="bookTotal">-</span></p>
+        <p>复本总数：<span id="copyTotal">-</span></p>
+        <p>在借数量：<span id="borrowed">-</span></p>
+        <p>可借数量：<span id="available">-</span></p>
+        <p>逾期数量：<span id="overdue">-</span></p>
+    </div>
+    <div class="card"><h3>罚款汇总（元）</h3>
+        <p>罚款总额：<span id="fineTotal">-</span></p>
+        <p>已缴纳：<span id="finePaid">-</span></p>
+        <p>未缴纳：<span id="fineUnpaid">-</span></p>
+        <p>已减免：<span id="fineWaived">-</span></p>
+    </div>
+</div>
+<h3>热门图书 TOP 10</h3>
+<table id="popularTable" class="grid">
+    <thead><tr><th>排名</th><th>书名</th><th>作者</th><th>借阅次数</th></tr></thead>
+    <tbody></tbody>
+</table>
+<script>
+fetch('/api/stats/overview').then(r=>r.json()).then(d=>{
+    var o=d.data;
+    document.getElementById('bookTotal').textContent=o.bookTotal;
+    document.getElementById('copyTotal').textContent=o.copyTotal;
+    document.getElementById('borrowed').textContent=o.borrowed;
+    document.getElementById('available').textContent=o.available;
+    document.getElementById('overdue').textContent=o.overdue;
+});
+fetch('/api/stats/fine').then(r=>r.json()).then(d=>{
+    var f=d.data;
+    document.getElementById('fineTotal').textContent=f.total;
+    document.getElementById('finePaid').textContent=f.paid;
+    document.getElementById('fineUnpaid').textContent=f.unpaid;
+    document.getElementById('fineWaived').textContent=f.waived;
+});
+fetch('/api/stats/popular?top=10').then(r=>r.json()).then(d=>{
+    var tb=document.querySelector('#popularTable tbody');
+    d.data.forEach(function(b,i){
+        var tr=document.createElement('tr');
+        tr.innerHTML='<td>'+(i+1)+'</td><td>'+b.title+'</td><td>'+b.author+'</td><td>'+b.borrowTimes+'</td>';
+        tb.appendChild(tr);
+    });
+});
+</script>
+</body>
+</html>

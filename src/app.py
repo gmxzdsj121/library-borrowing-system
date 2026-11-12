@@ -14,7 +14,8 @@ from urllib.parse import urlparse
 
 from src import config
 from src.common import logger
-from src.controller import auth_controller, book_controller, borrow_controller, reservation_controller
+from src.controller import (auth_controller, book_controller, borrow_controller,
+                             reservation_controller, stats_controller, notice_controller)
 from src.db.connection import ensure_ready
 from src.service import auth_service
 from src.service.auth_service import AuthError
@@ -37,6 +38,14 @@ ROLE_RULES = {
     "/api/reserve/cancel": ["READER"],
     "/api/reserve/my": ["READER"],
     "/api/reserve/queue": None,
+    # 迭代三：统计报表（FR-12）与通知公告（FR-13）
+    "/api/stats/overview": ["LIBRARIAN", "AUDITOR"],
+    "/api/stats/trend": ["LIBRARIAN", "AUDITOR"],
+    "/api/stats/popular": ["LIBRARIAN", "AUDITOR"],
+    "/api/stats/fine": ["LIBRARIAN", "AUDITOR"],
+    "/api/notice/publish": ["LIBRARIAN", "AUDITOR"],
+    "/api/notice/list": None,
+    "/api/notice/read": None,
 }
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -54,6 +63,8 @@ PAGES = {
     "/admin/return": "admin_return.html",
     "/admin/books": "admin_books.html",
     "/admin/fines": "admin_fines.html",
+    "/admin/stats": "admin_stats.html",
+    "/admin/notice": "admin_notice.html",
 }
 
 MAX_BODY = 64 * 1024
@@ -185,6 +196,23 @@ class LibraryHandler(BaseHTTPRequestHandler):
                 return self._handle_my_reservations()
             if path == "/api/reserve/queue" and method == "GET":
                 return self._json(200, reservation_controller.handle_book_queue(self._query()))
+
+            # ---- 迭代三：统计报表 / 通知公告 接口 ----
+            if path == "/api/stats/overview" and method == "GET":
+                return self._json(200, stats_controller.handle_overview())
+            if path == "/api/stats/trend" and method == "GET":
+                return self._json(200, stats_controller.handle_trend(self._query()))
+            if path == "/api/stats/popular" and method == "GET":
+                return self._json(200, stats_controller.handle_popular(self._query()))
+            if path == "/api/stats/fine" and method == "GET":
+                return self._json(200, stats_controller.handle_fine_summary())
+
+            if path == "/api/notice/publish" and method == "POST":
+                return self._json(200, notice_controller.handle_publish(self._payload(), self._current_user()))
+            if path == "/api/notice/list" and method == "GET":
+                return self._json(200, notice_controller.handle_list(self._current_user()))
+            if path == "/api/notice/read" and method == "POST":
+                return self._json(200, notice_controller.handle_read(self._payload(), self._current_user()))
 
             if path.startswith("/api/"):
                 return self._json(404, {"code": 404, "msg": "接口不存在", "data": None})

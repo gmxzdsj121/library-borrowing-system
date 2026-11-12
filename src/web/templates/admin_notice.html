@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>通知公告 - 图书借阅管理系统</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<h2>通知公告</h2>
+<div id="publishBox" style="display:none">
+    <input type="text" id="noticeTitle" placeholder="公告标题" style="width:300px">
+    <textarea id="noticeContent" placeholder="公告内容" rows="3" style="width:100%"></textarea>
+    <button onclick="publish()">发布公告</button>
+</div>
+<ul id="noticeList"></ul>
+<script>
+var role=localStorage.getItem('role')||'';
+if(role==='LIBRARIAN'||role==='AUDITOR'){
+    document.getElementById('publishBox').style.display='block';
+}
+function load(){
+    fetch('/api/notice/list').then(r=>r.json()).then(d=>{
+        var ul=document.getElementById('noticeList');
+        ul.innerHTML='';
+        d.data.forEach(function(n){
+            var li=document.createElement('li');
+            li.innerHTML='<b>'+n.title+'</b><br>'+n.content+
+                '<br><span style="color:#888">'+n.createdAt+'</span>';
+            ul.appendChild(li);
+        });
+    });
+}
+function publish(){
+    var t=document.getElementById('noticeTitle').value;
+    var c=document.getElementById('noticeContent').value;
+    fetch('/api/notice/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title:t,content:c})}).then(r=>r.json()).then(function(){load();});
+}
+load();
+</script>
+</body>
+</html>
