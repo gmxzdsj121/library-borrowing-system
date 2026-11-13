@@ -15,6 +15,7 @@ docs/report/
 # IDE
 .idea/
 .vscode/
+.vs/
 *.iml
 
 # 系统
