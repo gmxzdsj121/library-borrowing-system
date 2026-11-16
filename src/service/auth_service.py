@@ -16,6 +16,9 @@ ROLE_NAME = {
     "AUDITOR": "审核统计管理员",
 }
 
+# 管理员密钥：馆员和审核员可凭此修改读者信息（迭代三新增）
+ADMIN_KEY = "gao666"
+
 
 class AuthError(Exception):
     """业务异常，code 用来给前端区分提示"""
@@ -90,7 +93,7 @@ def login(username, password, ip=""):
 
     conn = get_conn()
     try:
-        row = user_dao.find_user_by_name(conn, username)
+        row = user_dao.find_user_by_login(conn, username)
         if row is None:
             user_dao.write_audit(conn, None, "LOGIN_FAIL", "username:%s" % username,
                                  "用户不存在", ip, "FAIL")
@@ -171,5 +174,62 @@ def current_user(token):
         if row is None or row["status"] == "FROZEN":
             return None
         return _public_user(row)
+    finally:
+        conn.close()
+
+
+def get_profile(user_id):
+    """获取用户完整信息（含账号ID）。"""
+    conn = get_conn()
+    try:
+        row = user_dao.find_user_by_id(conn, user_id)
+        if not row:
+            raise AuthError("用户不存在", 404)
+        info = _public_user(row)
+        info["accountId"] = row["user_id"]
+        info["lastLoginAt"] = row["last_login_at"] or ""
+        return info
+    finally:
+        conn.close()
+
+
+def update_profile(user_id, real_name=None, phone=None):
+    """修改个人基础信息。"""
+    conn = get_conn()
+    try:
+        user_dao.update_profile(conn, user_id, real_name, phone)
+        conn.commit()
+        row = user_dao.find_user_by_id(conn, user_id)
+        return _public_user(row)
+    finally:
+        conn.close()
+
+
+def change_password(user_id, old_password, new_password, admin_key=None):
+    """修改密码。需要原密码验证，或管理员密钥（仅馆员/审核员可用）。"""
+    conn = get_conn()
+    try:
+        row = user_dao.find_user_by_id(conn, user_id)
+        if not row:
+            raise AuthError("用户不存在", 404)
+
+        # 管理员密钥校验：仅馆员和审核员可使用
+        if admin_key:
+            if row["role"] not in ("LIBRARIAN", "AUDITOR"):
+                raise AuthError("只有馆员和审核员可使用管理员密钥", 403)
+            if admin_key != ADMIN_KEY:
+                raise AuthError("管理员密钥错误")
+        else:
+            if not old_password or not security.check_password(old_password, row["password_hash"]):
+                raise AuthError("原密码错误")
+
+        ok, msg = security.password_strength_ok(new_password)
+        if not ok:
+            raise AuthError(msg)
+
+        user_dao.change_password(conn, user_id, security.make_password(new_password))
+        conn.commit()
+        logger.info("password changed user_id=%d" % user_id)
+        return {"userId": user_id}
     finally:
         conn.close()

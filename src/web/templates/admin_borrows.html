@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>当前借阅情况</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar"><div class="logo">当前借阅情况</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <h3>未归还借阅列表</h3>
+    <p class="muted">显示所有读者当前在借的图书，按应还日期升序排列。读者归还后将自动从此列表移除。</p>
+    <div id="list">加载中...</div>
+  </section>
+</main>
+<script>
+async function load() {
+  const r = await fetch('/api/borrow/active');
+  if (r.status === 401) { location.href='/login'; return; }
+  const d = await r.json();
+  if (d.code !== 0) { document.getElementById('list').textContent = d.msg; return; }
+  if (!d.data.length) { document.getElementById('list').innerHTML = '<p>暂无在借记录</p>'; return; }
+  const rows = d.data.map(b => {
+    const overdue = b.status === 'OVERDUE' ? '<span style="color:#c00">已逾期</span>' : '<span style="color:#28a745">正常</span>';
+    return `<tr><td>${b.username}</td><td>${b.realName||''}</td><td>${b.title}</td><td>${b.barcode}</td>
+      <td>${b.borrowAt}</td><td>${b.dueAt}</td><td>${overdue}</td><td>${b.renewCount}</td></tr>`;
+  }).join('');
+  document.getElementById('list').innerHTML =
+    `<table class="grid"><tr><th>用户名</th><th>姓名</th><th>书名</th><th>条码</th><th>借出时间</th><th>应还时间</th><th>状态</th><th>续借次数</th></tr>${rows}</table>`;
+}
+load();
+</script>
+</body></html>

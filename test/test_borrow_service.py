@@ -69,8 +69,8 @@ class ReserveTest(DbTestCase):
         _admin_id, reader_id = _seed()
         book_id = book_service.create_book({"isbn": "I3", "title": "测试书3", "price": 30}, 1)["bookId"]
         # 没有复本，available=0，可以预约
-        res = reservation_service.reserve_book(reader_id, book_id)
-        self.assertEqual(res["queueNo"], 1)
+        res = reservation_service.reserve_book(reader_id, book_id, borrow_days=15)
+        self.assertEqual(res["status"], "PENDING")
 
 
 if __name__ == "__main__":

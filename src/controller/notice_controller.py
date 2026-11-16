@@ -17,3 +17,14 @@ def handle_list(user):
 def handle_read(payload, user):
     notice_service.mark_read(int(payload["noticeId"]), user["userId"])
     return {"code": 0, "msg": "ok", "data": None}
+
+
+def handle_update(payload, user):
+    data = notice_service.update_notice(
+        int(payload["noticeId"]), payload["title"], payload.get("content", ""))
+    return {"code": 0, "msg": "修改成功", "data": data}
+
+
+def handle_delete(payload, user):
+    notice_service.delete_notice(int(payload["noticeId"]))
+    return {"code": 0, "msg": "已删除", "data": None}

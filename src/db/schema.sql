@@ -134,8 +134,10 @@ CREATE TABLE IF NOT EXISTS reservation (
     reader_id      INTEGER NOT NULL,
     book_id        INTEGER NOT NULL,
     queue_no       INTEGER NOT NULL,
-    status         TEXT    NOT NULL DEFAULT 'QUEUING'
-                   CHECK (status IN ('QUEUING','READY','FULFILLED','EXPIRED','CANCELLED')),
+    borrow_days    INTEGER NOT NULL DEFAULT 30,  -- 读者申请借阅天数
+    status         TEXT    NOT NULL DEFAULT 'PENDING'
+                   CHECK (status IN ('PENDING','APPROVED','REJECTED','QUEUING','READY','FULFILLED','EXPIRED','CANCELLED')),
+    reject_reason  TEXT,
     created_at     TEXT    NOT NULL,
     ready_at       TEXT,
     expire_at      TEXT,
@@ -144,6 +146,7 @@ CREATE TABLE IF NOT EXISTS reservation (
     FOREIGN KEY (book_id) REFERENCES book(book_id)
 );
 CREATE INDEX IF NOT EXISTS idx_resv_book ON reservation(book_id, status);
+CREATE INDEX IF NOT EXISTS idx_resv_status ON reservation(status);
 
 -- 10. 罚款表（按借阅记录生成，可减免，减免需审核统计管理员审批）
 CREATE TABLE IF NOT EXISTS fine_record (

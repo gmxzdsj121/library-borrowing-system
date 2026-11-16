@@ -47,3 +47,8 @@ def handle_fine_waive(payload, user):
     # 审核统计管理员才能减免，角色校验在路由层做
     data = borrow_service.waive_fine(int(payload["fineId"]), user["userId"])
     return {"code": 0, "msg": "已减免", "data": data}
+
+
+def handle_active_borrows():
+    data = borrow_service.list_active_borrows_all()
+    return {"code": 0, "msg": "ok", "data": data}

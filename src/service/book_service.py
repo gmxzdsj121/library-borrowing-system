@@ -109,6 +109,19 @@ def list_categories():
         conn.close()
 
 
+def list_all_books():
+    """馆员列出所有书目（含可借/总数）。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT book_id, isbn, title, author, publisher, publish_year, category_id, "
+            "price, total_copies, available_copies, status FROM book ORDER BY book_id"
+        ).fetchall()
+        return [_book_dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 def _book_dict(row):
     return {
         "bookId": row["book_id"],

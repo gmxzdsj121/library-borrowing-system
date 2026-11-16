@@ -71,8 +71,8 @@ class ReservationServiceTest(DbTestCase):
 
         r1 = reservation_service.reserve_book(reader1, bid)
         r2 = reservation_service.reserve_book(reader2, bid)
-        self.assertEqual(r1["queueNo"], 1)
-        self.assertEqual(r2["queueNo"], 2)
+        self.assertEqual(r1["status"], "PENDING")
+        self.assertEqual(r2["status"], "PENDING")
 
     def test_cancel_reservation(self):
         conn = get_conn()

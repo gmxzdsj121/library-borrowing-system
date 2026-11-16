@@ -10,27 +10,54 @@
     <h3>新增书目</h3>
     <p>ISBN：<input id="isbn"> 书名：<input id="title"> 作者：<input id="author"></p>
     <p>出版社：<input id="publisher"> 出版年份：<input id="year"> 单价：<input id="price"></p>
-    <button onclick="createBook()">新增</button>
+    <button onclick="createBook()">新增书目</button>
   </section>
+
   <section class="card">
     <h3>给图书添加复本</h3>
+    <p class="muted">先在下方图书列表中找到要加复本的书，点击"选择"自动填入图书ID，再填写条码和位置。</p>
     <p>图书ID：<input id="bid"> 条码：<input id="code"> 位置：<input id="loc" value="A区"></p>
     <button onclick="addCopy()">添加复本</button>
   </section>
+
+  <section class="card">
+    <h3>图书列表（含图书ID）</h3>
+    <table class="grid">
+      <thead><tr><th>图书ID</th><th>书名</th><th>作者</th><th>ISBN</th><th>可借/总</th><th>操作</th></tr></thead>
+      <tbody id="bookList"></tbody>
+    </table>
+  </section>
 </main>
 <script>
+async function loadBooks() {
+  const r = await fetch('/api/book/list');
+  const d = await r.json();
+  const rows = d.data.map(b => `<tr><td>${b.bookId}</td><td>${b.title}</td><td>${b.author||''}</td>
+    <td>${b.isbn||''}</td><td>${b.availableCopies}/${b.totalCopies}</td>
+    <td><button onclick="pickBook(${b.bookId}, ${JSON.stringify(b.title).replace(/"/g,'&quot;')})">选择</button></td></tr>`).join('');
+  document.getElementById('bookList').innerHTML = rows;
+}
+function pickBook(bid, title) {
+  document.getElementById('bid').value = bid;
+  document.getElementById('code').value = '';
+  document.getElementById('code').focus();
+  alert('已选择《' + title + '》，图书ID=' + bid + '，请填写条码后添加复本');
+}
 async function createBook() {
   const body = {isbn:document.getElementById('isbn').value, title:document.getElementById('title').value,
     author:document.getElementById('author').value, publisher:document.getElementById('publisher').value,
     publishYear:+document.getElementById('year').value, price:+document.getElementById('price').value};
   const r = await fetch('/api/book/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d = await r.json(); alert(d.msg + (d.code===0?' ID='+d.data.bookId:''));
+  if (d.code===0) loadBooks();
 }
 async function addCopy() {
   const body = {bookId:+document.getElementById('bid').value, barcode:document.getElementById('code').value,
     location:document.getElementById('loc').value};
   const r = await fetch('/api/book/add-copy', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d = await r.json(); alert(d.msg);
+  if (d.code===0) loadBooks();
 }
+loadBooks();
 </script>
 </body></html>

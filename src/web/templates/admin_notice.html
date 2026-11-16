@@ -2,41 +2,89 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>通知公告 - 图书借阅管理系统</title>
+    <title>通知公告</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<h2>通知公告</h2>
-<div id="publishBox" style="display:none">
-    <input type="text" id="noticeTitle" placeholder="公告标题" style="width:300px">
-    <textarea id="noticeContent" placeholder="公告内容" rows="3" style="width:100%"></textarea>
-    <button onclick="publish()">发布公告</button>
-</div>
-<ul id="noticeList"></ul>
+<header class="topbar"><div class="logo">通知公告</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+<section class="card" id="publishBox" style="display:none">
+    <h3>发布 / 编辑公告</h3>
+    <p>标题：<input type="text" id="noticeTitle" style="width:50%"></p>
+    <p>内容：<textarea id="noticeContent" rows="3" style="width:100%"></textarea></p>
+    <input type="hidden" id="editId" value="">
+    <button onclick="publish()">发布</button>
+    <button onclick="resetForm()">重置</button>
+</section>
+<section class="card">
+    <h3>公告列表</h3>
+    <div id="noticeList"></div>
+</section>
+</main>
 <script>
-var role=localStorage.getItem('role')||'';
-if(role==='LIBRARIAN'||role==='AUDITOR'){
-    document.getElementById('publishBox').style.display='block';
+let isManager = false;
+async function init() {
+    const r = await fetch('/api/auth/me');
+    if (r.status === 401) { location.href = '/login'; return; }
+    const d = await r.json();
+    isManager = d.data && (d.data.role === 'LIBRARIAN' || d.data.role === 'AUDITOR');
+    if (isManager) document.getElementById('publishBox').style.display = 'block';
+    load();
 }
-function load(){
+function load() {
     fetch('/api/notice/list').then(r=>r.json()).then(d=>{
-        var ul=document.getElementById('noticeList');
-        ul.innerHTML='';
-        d.data.forEach(function(n){
-            var li=document.createElement('li');
-            li.innerHTML='<b>'+n.title+'</b><br>'+n.content+
-                '<br><span style="color:#888">'+n.createdAt+'</span>';
-            ul.appendChild(li);
-        });
+        const box = document.getElementById('noticeList');
+        if (!d.data || !d.data.length) { box.innerHTML = '<p>暂无公告</p>'; return; }
+        box.innerHTML = d.data.map(n => {
+            let actions = '';
+            if (isManager) {
+                actions = `<button onclick="editNotice(${n.noticeId}, ${JSON.stringify(n.title)})">编辑</button>
+                           <button onclick="delNotice(${n.noticeId})">删除</button>`;
+            }
+            return `<div class="notice-item"><b>${n.title}</b><br>${n.content}
+                <br><span style="color:#888;font-size:12px">${n.createdAt}</span>
+                <div style="margin-top:6px">${actions}</div><hr></div>`;
+        }).join('');
     });
 }
-function publish(){
-    var t=document.getElementById('noticeTitle').value;
-    var c=document.getElementById('noticeContent').value;
-    fetch('/api/notice/publish',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({title:t,content:c})}).then(r=>r.json()).then(function(){load();});
+function resetForm() {
+    document.getElementById('editId').value = '';
+    document.getElementById('noticeTitle').value = '';
+    document.getElementById('noticeContent').value = '';
 }
-load();
+async function editNotice(id, title) {
+    // 简单实现：用 prompt 让用户编辑内容
+    const newTitle = prompt('修改标题：', title);
+    if (newTitle === null) return;
+    const newContent = prompt('修改内容：', '');
+    if (newContent === null) return;
+    const r = await fetch('/api/notice/update', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({noticeId:id, title:newTitle, content:newContent})});
+    const d = await r.json();
+    alert(d.msg);
+    load();
+}
+async function delNotice(id) {
+    if (!confirm('确定删除该公告吗？')) return;
+    const r = await fetch('/api/notice/delete', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({noticeId:id})});
+    const d = await r.json();
+    alert(d.msg);
+    load();
+}
+function publish() {
+    const t = document.getElementById('noticeTitle').value;
+    const c = document.getElementById('noticeContent').value;
+    if (!t) { alert('请填写标题'); return; }
+    fetch('/api/notice/publish',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title:t,content:c})}).then(r=>r.json()).then(function(){
+            resetForm(); load();
+        });
+}
+init();
 </script>
 </body>
 </html>

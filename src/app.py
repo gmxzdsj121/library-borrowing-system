@@ -26,6 +26,7 @@ ROLE_RULES = {
     "/api/book/detail": None,
     "/api/book/categories": None,
     "/api/book/create": ["LIBRARIAN", "AUDITOR"],
+    "/api/book/list": ["LIBRARIAN", "AUDITOR"],
     "/api/book/add-copy": ["LIBRARIAN", "AUDITOR"],
     "/api/borrow/borrow": ["LIBRARIAN"],
     "/api/borrow/return": ["LIBRARIAN"],
@@ -46,6 +47,18 @@ ROLE_RULES = {
     "/api/notice/publish": ["LIBRARIAN", "AUDITOR"],
     "/api/notice/list": None,
     "/api/notice/read": None,
+    "/api/notice/update": ["LIBRARIAN", "AUDITOR"],
+    "/api/notice/delete": ["LIBRARIAN", "AUDITOR"],
+    # 迭代三新增：个人信息、读者管理、借阅情况、预约审批
+    "/api/auth/profile": None,
+    "/api/auth/profile/update": None,
+    "/api/auth/password": None,
+    "/api/reader/list": ["LIBRARIAN", "AUDITOR"],
+    "/api/reader/detail": ["LIBRARIAN", "AUDITOR"],
+    "/api/borrow/active": ["LIBRARIAN", "AUDITOR"],
+    "/api/reserve/pending": ["LIBRARIAN", "AUDITOR"],
+    "/api/reserve/approve": ["LIBRARIAN"],
+    "/api/reserve/reject": ["LIBRARIAN"],
 }
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -57,6 +70,7 @@ PAGES = {
     "/login": "login.html",
     "/register": "register.html",
     "/home": "home.html",
+    "/profile": "profile.html",
     "/books": "books.html",
     "/my": "my.html",
     "/admin/borrow": "admin_borrow.html",
@@ -65,6 +79,9 @@ PAGES = {
     "/admin/fines": "admin_fines.html",
     "/admin/stats": "admin_stats.html",
     "/admin/notice": "admin_notice.html",
+    "/admin/readers": "admin_readers.html",
+    "/admin/borrows": "admin_borrows.html",
+    "/admin/reservations": "admin_reservations.html",
 }
 
 MAX_BODY = 64 * 1024
@@ -170,6 +187,9 @@ class LibraryHandler(BaseHTTPRequestHandler):
                 return self._json(200, book_controller.handle_categories())
             if path == "/api/book/create" and method == "POST":
                 return self._handle_book_create()
+            if path == "/api/book/list" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, book_controller.handle_list(user))
             if path == "/api/book/add-copy" and method == "POST":
                 return self._handle_book_add_copy()
 
@@ -213,6 +233,42 @@ class LibraryHandler(BaseHTTPRequestHandler):
                 return self._json(200, notice_controller.handle_list(self._current_user()))
             if path == "/api/notice/read" and method == "POST":
                 return self._json(200, notice_controller.handle_read(self._payload(), self._current_user()))
+            if path == "/api/notice/update" and method == "POST":
+                return self._handle_notice_update()
+            if path == "/api/notice/delete" and method == "POST":
+                return self._handle_notice_delete()
+
+            # ---- 迭代三新增：个人信息 / 读者管理 / 借阅情况 / 预约审批 ----
+            if path == "/api/auth/profile" and method == "GET":
+                user = self._require(None)
+                return self._json(200, auth_controller.handle_profile(user))
+            if path == "/api/auth/profile/update" and method == "POST":
+                user = self._require(None)
+                return self._json(200, auth_controller.handle_update_profile(self._read_body(), user))
+            if path == "/api/auth/password" and method == "POST":
+                user = self._require(None)
+                return self._json(200, auth_controller.handle_change_password(self._read_body(), user))
+
+            if path == "/api/reader/list" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, self._handle_reader_list())
+            if path == "/api/reader/detail" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, self._handle_reader_detail())
+
+            if path == "/api/borrow/active" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, borrow_controller.handle_active_borrows())
+
+            if path == "/api/reserve/pending" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, reservation_controller.handle_pending())
+            if path == "/api/reserve/approve" and method == "POST":
+                user = self._require(["LIBRARIAN"])
+                return self._json(200, reservation_controller.handle_approve(self._read_body(), user))
+            if path == "/api/reserve/reject" and method == "POST":
+                user = self._require(["LIBRARIAN"])
+                return self._json(200, reservation_controller.handle_reject(self._read_body(), user))
 
             if path.startswith("/api/"):
                 return self._json(404, {"code": 404, "msg": "接口不存在", "data": None})
@@ -361,6 +417,60 @@ class LibraryHandler(BaseHTTPRequestHandler):
     def _handle_my_reservations(self):
         user = self._require(["READER"])
         result = reservation_controller.handle_my_reservations(user)
+        self._json(200, result)
+
+    # ---- 迭代三：读者管理 ----
+    def _handle_reader_list(self):
+        from src.dao import user_dao
+        from src.db.connection import get_conn
+        conn = get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT u.user_id, u.username, u.real_name, u.role, u.phone, u.status,
+                          r.reader_no, r.reader_type, r.credit_score
+                   FROM sys_user u
+                   LEFT JOIN reader_profile r ON u.user_id = r.user_id
+                   ORDER BY u.user_id"""
+            ).fetchall()
+            return {"code": 0, "msg": "ok", "data": [dict(r) for r in rows]}
+        finally:
+            conn.close()
+
+    def _handle_reader_detail(self):
+        from src.dao import user_dao, book_dao, borrow_dao
+        from src.db.connection import get_conn
+        user_id = self._query().get("userId")
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                """SELECT u.user_id, u.username, u.real_name, u.role, u.phone, u.status,
+                          u.created_at, r.reader_no, r.reader_type, r.credit_score, r.max_borrow
+                   FROM sys_user u
+                   LEFT JOIN reader_profile r ON u.user_id = r.user_id
+                   WHERE u.user_id = ?""", (user_id,)
+            ).fetchone()
+            if not row:
+                return {"code": 404, "msg": "读者不存在", "data": None}
+            info = dict(row)
+            rp = book_dao.get_reader_profile(conn, user_id)
+            if rp:
+                info["activeBorrows"] = borrow_dao.count_active_borrows(conn, rp["reader_id"])
+                info["hasUnpaidFine"] = borrow_dao.has_unpaid_fine(conn, rp["reader_id"])
+            return {"code": 0, "msg": "ok", "data": info}
+        finally:
+            conn.close()
+
+    # ---- 迭代三：通知公告编辑 ----
+    def _handle_notice_update(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        payload = self._read_body()
+        result = notice_controller.handle_update(payload, user)
+        self._json(200, result)
+
+    def _handle_notice_delete(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        payload = self._read_body()
+        result = notice_controller.handle_delete(payload, user)
         self._json(200, result)
 
 

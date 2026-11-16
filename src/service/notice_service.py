@@ -41,6 +41,26 @@ def mark_read(notice_id, user_id):
     return True
 
 
+def update_notice(notice_id, title, content):
+    """编辑公告。"""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE notice SET title = ?, content = ? WHERE notice_id = ?",
+        (title, content, notice_id))
+    conn.commit()
+    conn.close()
+    return {"noticeId": notice_id}
+
+
+def delete_notice(notice_id):
+    """删除公告。"""
+    conn = get_conn()
+    conn.execute("DELETE FROM notice WHERE notice_id = ?", (notice_id,))
+    conn.commit()
+    conn.close()
+    return {"noticeId": notice_id}
+
+
 def push_ready_notice(user_id, book_title):
     """预约到书时自动推送一条通知。"""
     conn = get_conn()

@@ -191,6 +191,33 @@ def list_my_borrows(reader_user_id):
         conn.close()
 
 
+def list_active_borrows_all():
+    """馆员查看所有未归还的借阅记录，含读者和图书信息。"""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT br.*, u.username, u.real_name, bc.barcode, b.title
+               FROM borrow_record br
+               JOIN reader_profile rp ON br.reader_id = rp.reader_id
+               JOIN sys_user u ON rp.user_id = u.user_id
+               JOIN book_copy bc ON br.copy_id = bc.copy_id
+               JOIN book b ON bc.book_id = b.book_id
+               WHERE br.status IN ('BORROWED','OVERDUE')
+               ORDER BY br.due_at ASC"""
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = _borrow_dict(r)
+            d["username"] = r["username"]
+            d["realName"] = r["real_name"]
+            d["barcode"] = r["barcode"]
+            d["title"] = r["title"]
+            result.append(d)
+        return result
+    finally:
+        conn.close()
+
+
 def pay_fine(fine_id, operator_id):
     conn = get_conn()
     try:

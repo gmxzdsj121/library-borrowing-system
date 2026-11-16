@@ -14,13 +14,13 @@ def get_next_queue_no(conn, book_id):
     return (row["m"] or 0) + 1
 
 
-def create_reservation(conn, reader_id, book_id):
+def create_reservation(conn, reader_id, book_id, borrow_days=30):
     q = get_next_queue_no(conn, book_id)
     cur = conn.execute(
         """INSERT INTO reservation
-           (reader_id, book_id, queue_no, status, created_at)
-           VALUES (?, ?, ?, 'QUEUING', ?)""",
-        (reader_id, book_id, q, now_str()),
+           (reader_id, book_id, queue_no, borrow_days, status, created_at)
+           VALUES (?, ?, ?, ?, 'PENDING', ?)""",
+        (reader_id, book_id, q, borrow_days, now_str()),
     )
     return cur.lastrowid
 
@@ -36,6 +36,36 @@ def list_reservations_by_reader(conn, reader_id):
         "SELECT * FROM reservation WHERE reader_id = ? ORDER BY created_at DESC",
         (reader_id,),
     ).fetchall()
+
+
+def list_pending_reservations(conn):
+    """列出所有待审批的预约申请，含读者与图书信息。"""
+    return conn.execute(
+        """SELECT r.*, u.username, u.real_name, b.title, b.isbn
+           FROM reservation r
+           JOIN reader_profile rp ON r.reader_id = rp.reader_id
+           JOIN sys_user u ON rp.user_id = u.user_id
+           JOIN book b ON r.book_id = b.book_id
+           WHERE r.status = 'PENDING'
+           ORDER BY r.created_at ASC"""
+    ).fetchall()
+
+
+def approve_reservation(conn, reservation_id):
+    """审批通过：状态从 PENDING 改为 QUEUING（进入预约队列）。"""
+    conn.execute(
+        "UPDATE reservation SET status = 'QUEUING' WHERE reservation_id = ? AND status = 'PENDING'",
+        (reservation_id,),
+    )
+
+
+def reject_reservation(conn, reservation_id, reason=""):
+    """审批拒绝。"""
+    conn.execute(
+        "UPDATE reservation SET status = 'REJECTED', reject_reason = ? "
+        "WHERE reservation_id = ? AND status = 'PENDING'",
+        (reason, reservation_id),
+    )
 
 
 def get_queuing_by_book(conn, book_id):
@@ -94,7 +124,7 @@ def cancel_reservation(conn, reservation_id):
 def has_queuing_reservation(conn, reader_id, book_id):
     row = conn.execute(
         "SELECT COUNT(*) AS c FROM reservation "
-        "WHERE reader_id = ? AND book_id = ? AND status IN ('QUEUING','READY')",
+        "WHERE reader_id = ? AND book_id = ? AND status IN ('PENDING','QUEUING','READY')",
         (reader_id, book_id),
     ).fetchone()
     return row["c"] > 0

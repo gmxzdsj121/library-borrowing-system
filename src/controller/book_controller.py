@@ -31,3 +31,8 @@ def handle_add_copy(payload, user):
 def handle_categories():
     data = book_service.list_categories()
     return {"code": 0, "msg": "ok", "data": data}
+
+
+def handle_list(user):
+    data = book_service.list_all_books()
+    return {"code": 0, "msg": "ok", "data": data}

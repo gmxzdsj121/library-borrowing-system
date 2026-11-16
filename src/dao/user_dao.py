@@ -15,10 +15,47 @@ def find_user_by_name(conn, username):
     ).fetchone()
 
 
+def find_user_by_login(conn, login_name):
+    """支持用户名或纯数字账号ID登录。"""
+    if login_name.isdigit():
+        row = conn.execute(
+            "SELECT * FROM sys_user WHERE user_id = ?", (int(login_name),)
+        ).fetchone()
+        if row:
+            return row
+    return conn.execute(
+        "SELECT * FROM sys_user WHERE username = ?", (login_name,)
+    ).fetchone()
+
+
 def find_user_by_id(conn, user_id):
     return conn.execute(
         "SELECT * FROM sys_user WHERE user_id = ?", (user_id,)
     ).fetchone()
+
+
+def update_profile(conn, user_id, real_name=None, phone=None):
+    sets = []
+    vals = []
+    if real_name is not None:
+        sets.append("real_name = ?")
+        vals.append(real_name)
+    if phone is not None:
+        sets.append("phone = ?")
+        vals.append(phone)
+    if not sets:
+        return
+    sets.append("updated_at = ?")
+    vals.append(now_str())
+    vals.append(user_id)
+    conn.execute("UPDATE sys_user SET %s WHERE user_id = ?" % ", ".join(sets), vals)
+
+
+def change_password(conn, user_id, new_password_hash):
+    conn.execute(
+        "UPDATE sys_user SET password_hash = ?, updated_at = ? WHERE user_id = ?",
+        (new_password_hash, now_str(), user_id),
+    )
 
 
 def create_user(conn, username, password_hash, real_name, phone, role="READER"):

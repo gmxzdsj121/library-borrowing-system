@@ -12,7 +12,7 @@
   </section>
   <section class="card">
     <table class="grid">
-      <thead><tr><th>ISBN</th><th>书名</th><th>作者</th><th>出版社</th><th>可借/总</th><th>操作</th></tr></thead>
+      <thead><tr><th>图书ID</th><th>ISBN</th><th>书名</th><th>作者</th><th>出版社</th><th>可借/总</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
   </section>
@@ -26,11 +26,24 @@ async function search() {
   tb.innerHTML = '';
   for (const b of d.data.list) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${b.isbn||'-'}</td><td>${b.title}</td><td>${b.author||'-'}</td>`
+    tr.innerHTML = `<td>${b.bookId}</td><td>${b.isbn||'-'}</td><td>${b.title}</td><td>${b.author||'-'}</td>`
       + `<td>${b.publisher||'-'}</td><td>${b.availableCopies}/${b.totalCopies}</td>`
-      + `<td><a href="/my?reserve=${b.bookId}">预约</a></td>`;
+      + `<td><button onclick="doReserve(${b.bookId}, ${b.availableCopies})">预约</button></td>`;
     tb.appendChild(tr);
   }
+}
+async function doReserve(bookId, available) {
+  if (available > 0) {
+    alert('该书有可借复本，请联系馆员办理借阅，无需预约');
+    return;
+  }
+  const days = prompt('请输入借阅天数（1-60，默认30）：', '30');
+  if (days === null) return;
+  const r = await fetch('/api/reserve', {method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({bookId: bookId, borrowDays: parseInt(days)||30})});
+  const d = await r.json();
+  alert(d.msg);
 }
 search();
 </script>

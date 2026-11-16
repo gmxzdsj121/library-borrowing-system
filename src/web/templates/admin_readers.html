@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>读者信息管理</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar"><div class="logo">读者信息管理</div>
+<div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
+<main class="container">
+  <section class="card">
+    <h3>读者列表</h3>
+    <div id="readerList">加载中...</div>
+  </section>
+  <section class="card" id="detailCard" style="display:none">
+    <h3>读者详情</h3>
+    <div id="readerDetail"></div>
+  </section>
+</main>
+<script>
+const ROLE_MAP = {READER:'读者', LIBRARIAN:'图书馆管理员', AUDITOR:'审核统计管理员'};
+async function load() {
+  const r = await fetch('/api/reader/list');
+  if (r.status === 401) { location.href='/login'; return; }
+  const d = await r.json();
+  if (d.code !== 0) { document.getElementById('readerList').textContent = d.msg; return; }
+  const rows = d.data.map(r => `<tr><td>${r.user_id}</td><td>${r.username}</td><td>${r.real_name||''}</td>
+    <td>${ROLE_MAP[r.role]||r.role}</td><td>${r.phone||''}</td><td>${r.status}</td>
+    <td><button onclick="showDetail(${r.user_id})">查看</button></td></tr>`).join('');
+  document.getElementById('readerList').innerHTML =
+    `<table class="grid"><tr><th>账号ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>手机号</th><th>状态</th><th>操作</th></tr>${rows}</table>`;
+}
+async function showDetail(uid) {
+  const r = await fetch('/api/reader/detail?userId='+uid);
+  const d = await r.json();
+  if (d.code !== 0) { alert(d.msg); return; }
+  const u = d.data;
+  document.getElementById('detailCard').style.display = 'block';
+  document.getElementById('readerDetail').innerHTML = `
+    <table class="grid">
+      <tr><td>账号ID</td><td>${u.user_id}</td></tr>
+      <tr><td>用户名</td><td>${u.username}</td></tr>
+      <tr><td>姓名</td><td>${u.real_name||''}</td></tr>
+      <tr><td>读者证号</td><td>${u.reader_no||'—'}</td></tr>
+      <tr><td>读者类型</td><td>${u.reader_type||'—'}</td></tr>
+      <tr><td>手机号</td><td>${u.phone||'—'}</td></tr>
+      <tr><td>信用分</td><td>${u.credit_score}</td></tr>
+      <tr><td>在借册数</td><td>${u.activeBorrows||0}</td></tr>
+      <tr><td>未结清罚款</td><td>${u.hasUnpaidFine?'有':'无'}</td></tr>
+      <tr><td>注册时间</td><td>${u.created_at}</td></tr>
+    </table>`;
+}
+load();
+</script>
+</body></html>
