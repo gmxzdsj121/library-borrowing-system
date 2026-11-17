@@ -8,7 +8,7 @@
 </head>
 <body class="home-page">
 <header class="topbar">
-  <div class="logo">图书借阅管理系统</div>
+  <div class="logo">📚 图书借阅管理系统</div>
   <div class="user-area">
     <span id="who">加载中…</span>
     <a href="/profile" class="link-btn">我的信息</a>
@@ -19,48 +19,128 @@
 <main class="container">
   <section class="card">
     <h2>欢迎回来，<span id="name">—</span></h2>
-    <p class="muted">当前角色：<span id="role">—</span>　账号ID：<span id="aid">—</span>　用户名：<span id="account">—</span></p>
-    <hr>
-    <p>当前迭代为<strong>迭代三（最终迭代）</strong>，已开放图书检索、借阅登记、归还与逾期罚款、续借、预约审批、读者管理、借阅情况、统计报表、通知公告等全部功能。</p>
+    <p class="muted">当前身份：<span id="role" style="color:var(--primary);font-weight:600">—</span>　|　账号ID：<span id="aid">—</span>　|　用户名：<span id="account">—</span></p>
   </section>
 
-  <!-- 按角色显示不同的功能入口 -->
-  <section class="card small" id="menuReader" style="display:none">
-    <h3>读者功能</h3>
-    <ul class="menu">
-      <li><a href="/books">图书检索</a></li>
-      <li><a href="/my">我的借阅 / 续借</a></li>
-      <li><a href="/my#fines">我的罚款</a></li>
-      <li><a href="/my#reserve">我的预约</a></li>
-      <li><a href="/admin/notice">通知公告</a></li>
-      <li><a href="/profile">我的信息 / 修改密码</a></li>
-    </ul>
+  <!-- 读者功能卡片 -->
+  <section id="menuReader" style="display:none">
+    <h2 class="section-title">读者功能</h2>
+    <div class="feature-grid">
+      <a href="/books" class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <div class="feature-title">图书检索</div>
+        <div class="feature-desc">查找馆内图书，查看可借状态</div>
+      </a>
+      <a href="/my" class="feature-card">
+        <div class="feature-icon">📖</div>
+        <div class="feature-title">我的借阅</div>
+        <div class="feature-desc">查看借阅记录、续借图书</div>
+      </a>
+      <a href="/my#fines" class="feature-card">
+        <div class="feature-icon">💰</div>
+        <div class="feature-title">我的罚款</div>
+        <div class="feature-desc">查看逾期罚款缴纳情况</div>
+      </a>
+      <a href="/my#reserve" class="feature-card">
+        <div class="feature-icon">📋</div>
+        <div class="feature-title">我的预约</div>
+        <div class="feature-desc">预约排队、到书提醒、取消预约</div>
+      </a>
+      <a href="/admin/notice" class="feature-card">
+        <div class="feature-icon">📢</div>
+        <div class="feature-title">通知公告</div>
+        <div class="feature-desc">查看图书馆最新公告</div>
+      </a>
+      <a href="/profile" class="feature-card">
+        <div class="feature-icon">👤</div>
+        <div class="feature-title">我的信息</div>
+        <div class="feature-desc">修改个人资料与登录密码</div>
+      </a>
+    </div>
   </section>
 
-  <section class="card small" id="menuLibrarian" style="display:none">
-    <h3>图书馆管理员功能</h3>
-    <ul class="menu">
-      <li><a href="/admin/books">图书与馆藏管理</a></li>
-      <li><a href="/admin/borrow">借阅登记</a></li>
-      <li><a href="/admin/return">归还处理</a></li>
-      <li><a href="/admin/borrows">借阅情况查询</a></li>
-      <li><a href="/admin/reservations">预约审批</a></li>
-      <li><a href="/admin/readers">读者信息管理</a></li>
-      <li><a href="/admin/fines">罚款收取</a></li>
-      <li><a href="/admin/stats">借阅统计报表</a></li>
-      <li><a href="/admin/notice">通知公告</a></li>
-    </ul>
+  <!-- 馆员功能卡片 -->
+  <section id="menuLibrarian" style="display:none">
+    <h2 class="section-title">馆员功能</h2>
+    <div class="feature-grid">
+      <a href="/admin/books" class="feature-card">
+        <div class="feature-icon">📚</div>
+        <div class="feature-title">图书与馆藏</div>
+        <div class="feature-desc">新增书目、添加复本</div>
+      </a>
+      <a href="/admin/borrow" class="feature-card">
+        <div class="feature-icon">📤</div>
+        <div class="feature-title">借阅登记</div>
+        <div class="feature-desc">为读者办理借书手续</div>
+      </a>
+      <a href="/admin/return" class="feature-card">
+        <div class="feature-icon">📥</div>
+        <div class="feature-title">归还处理</div>
+        <div class="feature-desc">办理还书、自动计算罚款</div>
+      </a>
+      <a href="/admin/borrows" class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">借阅情况</div>
+        <div class="feature-desc">查询所有在借记录与图表</div>
+      </a>
+      <a href="/admin/reservations" class="feature-card">
+        <div class="feature-icon">✅</div>
+        <div class="feature-title">预约审批</div>
+        <div class="feature-desc">审批读者的预约申请</div>
+      </a>
+      <a href="/admin/readers" class="feature-card">
+        <div class="feature-icon">👥</div>
+        <div class="feature-title">读者管理</div>
+        <div class="feature-desc">查看读者信息、重置密码</div>
+      </a>
+      <a href="/admin/fines" class="feature-card">
+        <div class="feature-icon">💳</div>
+        <div class="feature-title">罚款收取</div>
+        <div class="feature-desc">收取读者逾期罚款</div>
+      </a>
+      <a href="/admin/stats" class="feature-card">
+        <div class="feature-icon">📈</div>
+        <div class="feature-title">统计报表</div>
+        <div class="feature-desc">馆藏与借阅统计数据</div>
+      </a>
+      <a href="/admin/notice" class="feature-card">
+        <div class="feature-icon">📢</div>
+        <div class="feature-title">通知公告</div>
+        <div class="feature-desc">发布与管理图书馆公告</div>
+      </a>
+    </div>
   </section>
 
-  <section class="card small" id="menuAuditor" style="display:none">
-    <h3>审核统计管理员功能</h3>
-    <ul class="menu">
-      <li><a href="/admin/fines">罚款减免审批</a></li>
-      <li><a href="/admin/stats">借阅统计报表</a></li>
-      <li><a href="/admin/notice">公告发布与管理</a></li>
-      <li><a href="/admin/readers">读者信息查询</a></li>
-      <li><a href="/admin/borrows">借阅情况查询</a></li>
-    </ul>
+  <!-- 管理员功能卡片 -->
+  <section id="menuAuditor" style="display:none">
+    <h2 class="section-title">管理员功能</h2>
+    <div class="feature-grid">
+      <a href="/admin/fines" class="feature-card">
+        <div class="feature-icon">✅</div>
+        <div class="feature-title">罚款减免</div>
+        <div class="feature-desc">审批读者罚款减免申请</div>
+      </a>
+      <a href="/admin/stats" class="feature-card">
+        <div class="feature-icon">📈</div>
+        <div class="feature-title">统计报表</div>
+        <div class="feature-desc">馆藏与借阅统计数据</div>
+      </a>
+      <a href="/admin/notice" class="feature-card">
+        <div class="feature-icon">📢</div>
+        <div class="feature-title">公告管理</div>
+        <div class="feature-desc">发布与管理图书馆公告</div>
+      </a>
+      <a href="/admin/readers" class="feature-card">
+        <div class="feature-icon">👥</div>
+        <div class="feature-title">读者查询</div>
+        <div class="feature-desc">查看读者信息、重置密码</div>
+      </a>
+      <a href="/admin/borrows" class="feature-card">
+        <div class="feature-icon">📊</div>
+        <div class="feature-title">借阅情况</div>
+        <div class="feature-desc">查询所有在借记录与图表</div>
+      </a>
+    </div>
   </section>
 </main>
 
@@ -78,7 +158,6 @@
     document.getElementById('role').textContent = u.roleName;
     document.getElementById('aid').textContent = u.userId;
     document.getElementById('account').textContent = u.username;
-    // 根据角色显示对应菜单
     document.getElementById('menuReader').style.display = u.role === 'READER' ? 'block' : 'none';
     document.getElementById('menuLibrarian').style.display = u.role === 'LIBRARIAN' ? 'block' : 'none';
     document.getElementById('menuAuditor').style.display = u.role === 'AUDITOR' ? 'block' : 'none';

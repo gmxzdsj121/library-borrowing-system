@@ -29,16 +29,17 @@ def create_category(conn, name, parent_id=None, sort_no=0):
 
 # ---------- 书目 ----------
 def list_books(conn, keyword=None, category_id=None, page=1, page_size=20):
-    sql = "SELECT * FROM book WHERE 1=1"
+    sql = ("SELECT b.*, c.name AS category_name FROM book b "
+           "LEFT JOIN book_category c ON b.category_id = c.category_id WHERE 1=1")
     args = []
     if keyword:
-        sql += " AND (title LIKE ? OR author LIKE ? OR isbn LIKE ?)"
+        sql += " AND (b.title LIKE ? OR b.author LIKE ? OR b.isbn LIKE ?)"
         kw = "%%%s%%" % keyword
         args += [kw, kw, kw]
     if category_id:
-        sql += " AND category_id = ?"
+        sql += " AND b.category_id = ?"
         args.append(category_id)
-    sql += " ORDER BY book_id DESC LIMIT ? OFFSET ?"
+    sql += " ORDER BY b.book_id DESC LIMIT ? OFFSET ?"
     args.append(page_size)
     args.append((page - 1) * page_size)
     return conn.execute(sql, args).fetchall()
@@ -72,23 +73,22 @@ def get_book_by_isbn(conn, isbn):
     ).fetchone()
 
 
-def create_book(conn, isbn, title, author, publisher, publish_year,
-                category_id, price):
+def create_book(conn, isbn, title, author, publisher, publish_date,
+                category_id, shelf, price):
     ts = now_str()
     cur = conn.execute(
         """INSERT INTO book
-           (isbn, title, author, publisher, publish_year, category_id, price,
+           (isbn, title, author, publisher, publish_date, category_id, shelf, price,
             total_copies, available_copies, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 'ON_SHELF', ?, ?)""",
-        (isbn, title, author, publisher, publish_year, category_id, price, ts, ts),
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'ON_SHELF', ?, ?)""",
+        (isbn, title, author, publisher, publish_date, category_id, shelf, price, ts, ts),
     )
     return cur.lastrowid
 
 
 def update_book(conn, book_id, **fields):
-    # 10-28: 用拼接 SQL 最省事，字段白名单在 service 里已经卡过了
-    allowed = ("isbn", "title", "author", "publisher", "publish_year",
-               "category_id", "price", "status")
+    allowed = ("isbn", "title", "author", "publisher", "publish_date",
+               "category_id", "shelf", "price", "status")
     sets = []
     vals = []
     for k, v in fields.items():

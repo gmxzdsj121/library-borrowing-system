@@ -27,7 +27,7 @@ def list_notices(user_id, limit=20):
            ORDER BY created_at DESC LIMIT ?""",
         (user_id, limit)).fetchall()
     conn.close()
-    return [{"id": r["notice_id"], "title": r["title"], "content": r["content"],
+    return [{"noticeId": r["notice_id"], "title": r["title"], "content": r["content"],
              "type": r["type"], "isRead": r["is_read"], "createdAt": r["created_at"]}
             for r in rows]
 

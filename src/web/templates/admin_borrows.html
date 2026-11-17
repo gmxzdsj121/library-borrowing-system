@@ -10,26 +10,120 @@
 <div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
 <main class="container">
   <section class="card">
-    <h3>未归还借阅列表</h3>
+    <h3>未归还借阅列表
+      <button class="btn-sm btn-success" style="float:right" onclick="exportBorrows()">导出 CSV</button>
+    </h3>
     <p class="muted">显示所有读者当前在借的图书，按应还日期升序排列。读者归还后将自动从此列表移除。</p>
-    <div id="list">加载中...</div>
+    <div class="view-toggle">
+      <button class="btn-sm active" id="btnTable" onclick="switchView('table')">表格视图</button>
+      <button class="btn-sm inactive" id="btnChart" onclick="switchView('chart')">图形视图</button>
+    </div>
+    <div id="tableView">
+      <div id="list">加载中...</div>
+    </div>
+    <div id="chartView" style="display:none">
+      <div class="stats-grid" id="statSummary"></div>
+      <h3 style="margin:18px 0 10px;color:var(--primary)">借阅状态分布</h3>
+      <div class="chart-wrap" id="statusChart"></div>
+      <div class="legend">
+        <span class="l-borrow">正常借阅</span>
+        <span class="l-overdue">已逾期</span>
+      </div>
+      <h3 style="margin:24px 0 10px;color:var(--primary)">在借图书 TOP</h3>
+      <div class="chart-wrap" id="bookChart" style="min-height:200px"></div>
+    </div>
   </section>
 </main>
+<script src="/static/common.js"></script>
 <script>
+let allData = [];
+
 async function load() {
   const r = await fetch('/api/borrow/active');
   if (r.status === 401) { location.href='/login'; return; }
   const d = await r.json();
   if (d.code !== 0) { document.getElementById('list').textContent = d.msg; return; }
-  if (!d.data.length) { document.getElementById('list').innerHTML = '<p>暂无在借记录</p>'; return; }
-  const rows = d.data.map(b => {
-    const overdue = b.status === 'OVERDUE' ? '<span style="color:#c00">已逾期</span>' : '<span style="color:#28a745">正常</span>';
+  allData = d.data || [];
+  renderTable();
+  renderChart();
+}
+
+function renderTable() {
+  const box = document.getElementById('list');
+  if (!allData.length) { box.innerHTML = '<p class="muted">暂无在借记录</p>'; return; }
+  const rows = allData.map(b => {
+    const overdue = b.status === 'OVERDUE'
+      ? '<span class="status-tag status-danger">已逾期</span>'
+      : '<span class="status-tag status-normal">正常</span>';
     return `<tr><td>${b.username}</td><td>${b.realName||''}</td><td>${b.title}</td><td>${b.barcode}</td>
       <td>${b.borrowAt}</td><td>${b.dueAt}</td><td>${overdue}</td><td>${b.renewCount}</td></tr>`;
   }).join('');
-  document.getElementById('list').innerHTML =
+  box.innerHTML =
     `<table class="grid"><tr><th>用户名</th><th>姓名</th><th>书名</th><th>条码</th><th>借出时间</th><th>应还时间</th><th>状态</th><th>续借次数</th></tr>${rows}</table>`;
 }
+
+function renderChart() {
+  const normal = allData.filter(b => b.status === 'BORROWED').length;
+  const overdue = allData.filter(b => b.status === 'OVERDUE').length;
+  const total = allData.length;
+
+  // 统计卡片
+  document.getElementById('statSummary').innerHTML = `
+    <div class="stat-card"><div class="stat-label">在借总数</div><div class="stat-num">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">正常借阅</div><div class="stat-num" style="color:var(--success)">${normal}</div></div>
+    <div class="stat-card"><div class="stat-label">已逾期</div><div class="stat-num" style="color:var(--danger)">${overdue}</div></div>
+    <div class="stat-card"><div class="stat-label">逾期率</div><div class="stat-num" style="color:var(--accent)">${total?Math.round(overdue/total*100):0}%</div></div>
+  `;
+
+  // 状态分布柱状图
+  const max = Math.max(normal, overdue, 1);
+  const statusHtml = [
+    {label:'正常借阅', val:normal, cls:'borrow'},
+    {label:'已逾期', val:overdue, cls:'overdue'}
+  ].map(item => `
+    <div class="chart-bar-group">
+      <div class="chart-value">${item.val}</div>
+      <div class="chart-bar ${item.cls}" style="height:${item.val/max*200}px"></div>
+      <div class="chart-label">${item.label}</div>
+    </div>
+  `).join('');
+  document.getElementById('statusChart').innerHTML = statusHtml || '<p class="muted">暂无数据</p>';
+
+  // 按书名统计在借数量 TOP
+  const bookCount = {};
+  allData.forEach(b => { bookCount[b.title] = (bookCount[b.title]||0) + 1; });
+  const topBooks = Object.entries(bookCount).sort((a,b)=>b[1]-a[1]).slice(0, 8);
+  const maxBook = Math.max(...topBooks.map(x=>x[1]), 1);
+  const bookHtml = topBooks.map(([title, cnt]) => `
+    <div class="chart-bar-group">
+      <div class="chart-value">${cnt}</div>
+      <div class="chart-bar borrow" style="height:${cnt/maxBook*160}px"></div>
+      <div class="chart-label" title="${title}">${title.length>6?title.slice(0,6)+'…':title}</div>
+    </div>
+  `).join('');
+  document.getElementById('bookChart').innerHTML = bookHtml || '<p class="muted">暂无数据</p>';
+}
+
+function switchView(v) {
+  const btnT = document.getElementById('btnTable');
+  const btnC = document.getElementById('btnChart');
+  if (v === 'table') {
+    document.getElementById('tableView').style.display = 'block';
+    document.getElementById('chartView').style.display = 'none';
+    btnT.className = 'btn-sm active';
+    btnC.className = 'btn-sm inactive';
+  } else {
+    document.getElementById('tableView').style.display = 'none';
+    document.getElementById('chartView').style.display = 'block';
+    btnC.className = 'btn-sm active';
+    btnT.className = 'btn-sm inactive';
+  }
+}
+
+function exportBorrows() {
+  window.location.href = '/api/export/borrows';
+}
+
 load();
 </script>
 </body></html>

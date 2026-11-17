@@ -23,24 +23,25 @@
 
   <section class="card">
     <h3>修改基础信息</h3>
-    <p>真实姓名：<input id="newName"> 手机号：<input id="newPhone"></p>
-    <button onclick="updateProfile()">保存修改</button>
+    <p>真实姓名：<input id="newName" style="max-width:200px"> 手机号：<input id="newPhone" style="max-width:200px"></p>
+    <button class="btn-primary" onclick="updateProfile()">保存修改</button>
   </section>
 
   <section class="card">
     <h3>修改密码</h3>
-    <p>原密码：<input type="password" id="oldPwd"></p>
-    <p>新密码：<input type="password" id="newPwd"></p>
-    <p class="muted">馆员/审核员也可使用管理员密钥修改：<input type="password" id="adminKey" placeholder="管理员密钥"></p>
-    <button onclick="changePwd()">修改密码</button>
+    <p>原密码：<input type="password" id="oldPwd" style="max-width:240px"></p>
+    <p>新密码：<input type="password" id="newPwd" style="max-width:240px"></p>
+    <p class="muted">提示：修改密码需要验证原密码。新密码至少 8 位，需包含字母和数字。</p>
+    <button class="btn-primary" onclick="changePwd()">修改密码</button>
   </section>
 </main>
+<script src="/static/common.js"></script>
 <script>
 async function loadProfile() {
   const r = await fetch('/api/auth/profile');
   if (r.status === 401) { location.href = '/login'; return; }
   const d = await r.json();
-  if (d.code !== 0) { alert(d.msg); return; }
+  if (d.code !== 0) { showToast(d.msg, 'error'); return; }
   const u = d.data;
   document.getElementById('accountId').textContent = u.accountId;
   document.getElementById('username').textContent = u.username;
@@ -57,18 +58,16 @@ async function updateProfile() {
     body:JSON.stringify({realName:document.getElementById('newName').value,
                          phone:document.getElementById('newPhone').value})});
   const d = await r.json();
-  alert(d.msg);
+  showToast(d.msg, d.code===0?'success':'error');
   if (d.code === 0) loadProfile();
 }
 async function changePwd() {
   const body = {oldPassword:document.getElementById('oldPwd').value,
                 newPassword:document.getElementById('newPwd').value};
-  const ak = document.getElementById('adminKey').value;
-  if (ak) body.adminKey = ak;
   const r = await fetch('/api/auth/password', {method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const d = await r.json();
-  alert(d.msg);
+  showToast(d.msg, d.code===0?'success':'error');
   if (d.code === 0) { document.getElementById('oldPwd').value=''; document.getElementById('newPwd').value=''; }
 }
 loadProfile();

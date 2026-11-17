@@ -8,58 +8,133 @@
 <main class="container">
   <section class="card" id="sec-borrows">
     <h3>借阅记录</h3>
-    <table class="grid"><thead><tr><th>记录ID</th><th>借出时间</th><th>应还</th><th>状态</th><th>续借次数</th><th>操作</th></tr></thead>
-    <tbody id="borrows"></tbody></table>
+    <p>搜索：<input id="borrowKw" placeholder="书名 / 条码" style="max-width:220px">
+       <button class="btn-sm btn-primary" onclick="loadBorrows(1)">搜索</button></p>
+    <table class="grid">
+      <thead><tr><th>书名</th><th>条码</th><th>借出时间</th><th>应还</th><th>状态</th><th>续借次数</th><th>操作</th></tr></thead>
+      <tbody id="borrows"></tbody>
+    </table>
+    <div id="borrowPager" style="margin-top:12px;text-align:center"></div>
+    <p class="muted" id="borrowPageInfo" style="text-align:center"></p>
   </section>
   <section class="card" id="sec-fines">
     <h3>我的罚款</h3>
-    <table class="grid"><thead><tr><th>罚款ID</th><th>逾期天数</th><th>金额</th><th>状态</th></tr></thead>
-    <tbody id="fines"></tbody></table>
+    <table class="grid">
+      <thead><tr><th>罚款ID</th><th>逾期天数</th><th>金额</th><th>状态</th></tr></thead>
+      <tbody id="fines"></tbody>
+    </table>
   </section>
   <section class="card" id="sec-reserve">
     <h3>我的预约</h3>
-    <table class="grid"><thead><tr><th>预约ID</th><th>图书ID</th><th>排队号</th><th>状态</th><th>操作</th></tr></thead>
-    <tbody id="reserves"></tbody></table>
+    <table class="grid">
+      <thead><tr><th>书名</th><th>借阅天数</th><th>排队号</th><th>状态</th><th>拒绝原因</th><th>操作</th></tr></thead>
+      <tbody id="reserves"></tbody>
+    </table>
   </section>
 </main>
+<script src="/static/common.js"></script>
 <script>
+const BORROW_STATUS = {
+  BORROWED: '<span class="status-tag status-normal">借阅中</span>',
+  OVERDUE: '<span class="status-tag status-danger">已逾期</span>',
+  RETURNED: '<span class="status-tag status-muted">已归还</span>'
+};
+const RESERVE_STATUS = {
+  PENDING: '<span class="status-tag status-warn">待审批</span>',
+  QUEUING: '<span class="status-tag status-info">排队中</span>',
+  READY: '<span class="status-tag status-success">已到馆</span>',
+  REJECTED: '<span class="status-tag status-danger">已拒绝</span>',
+  FULFILLED: '<span class="status-tag status-muted">已完成</span>',
+  EXPIRED: '<span class="status-tag status-muted">已过期</span>',
+  CANCELLED: '<span class="status-tag status-muted">已取消</span>',
+  APPROVED: '<span class="status-tag status-info">已通过</span>'
+};
+const FINE_STATUS = {
+  UNPAID: '<span class="status-tag status-danger">未缴纳</span>',
+  PAID: '<span class="status-tag status-success">已缴纳</span>',
+  WAIVED: '<span class="status-tag status-info">已减免</span>'
+};
+
+async function loadBorrows(page) {
+  page = page || 1;
+  const kw = document.getElementById('borrowKw').value;
+  let url = '/api/borrow/my?page=' + page + '&pageSize=10';
+  if (kw) url += '&keyword=' + encodeURIComponent(kw);
+  const bs = await (await fetch(url)).json();
+  const data = bs.data || {list:[], total:0, page:1};
+  const tb = document.getElementById('borrows');
+  tb.innerHTML = '';
+  if (!data.list.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="muted">暂无借阅记录</td></tr>';
+  } else {
+    data.list.forEach(b => {
+      const canRenew = b.status === 'BORROWED' && b.renewCount < 2;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${b.title}</td><td>${b.barcode}</td><td>${b.borrowAt}</td><td>${b.dueAt}</td>`
+        + `<td>${BORROW_STATUS[b.status] || b.status}</td><td>${b.renewCount}</td>`
+        + `<td>${canRenew ? `<button class="btn-sm btn-primary" onclick="renew(${b.recordId})">续借</button>` : '-'}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+  const totalPages = Math.ceil(data.total / 10) || 1;
+  document.getElementById('borrowPageInfo').textContent = '共 ' + data.total + ' 条，第 ' + data.page + '/' + totalPages + ' 页';
+  let pager = '';
+  if (data.page > 1) pager += `<button class="btn-sm btn-secondary" onclick="loadBorrows(${data.page-1})">上一页</button> `;
+  if (data.page < totalPages) pager += `<button class="btn-sm btn-secondary" onclick="loadBorrows(${data.page+1})">下一页</button>`;
+  pager += `　跳至 <input type="number" id="bJumpPage" min="1" max="${totalPages}" value="${data.page}" style="width:60px;text-align:center"> 页 <button class="btn-sm btn-primary" onclick="jumpBorrow()">GO</button>`;
+  document.getElementById('borrowPager').innerHTML = pager;
+}
+
+function jumpBorrow() {
+  const p = parseInt(document.getElementById('bJumpPage').value);
+  if (p >= 1) loadBorrows(p);
+}
+
 async function load() {
   const u = await (await fetch('/api/auth/me')).json();
   if (u.code !== 0) { location.href = '/login'; return; }
-  const bs = await (await fetch('/api/borrow/my')).json();
-  const tb = document.getElementById('borrows');
-  bs.data.forEach(b => {
-    const canRenew = b.status === 'BORROWED' && b.renewCount < 2;
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${b.recordId}</td><td>${b.borrowAt}</td><td>${b.dueAt}</td><td>${b.status}</td><td>${b.renewCount}</td>`
-      + `<td>${canRenew ? `<button onclick="renew(${b.recordId})">续借</button>` : '-'}</td>`;
-    tb.appendChild(tr);
-  });
+
+  loadBorrows(1);
+
   const fs = await (await fetch('/api/fine/list')).json();
   const ft = document.getElementById('fines');
-  fs.data.forEach(f => ft.insertAdjacentHTML('beforeend',
-    `<tr><td>${f.fine_id}</td><td>${f.overdue_days}</td><td>${f.amount}</td><td>${f.status}</td></tr>`));
+  ft.innerHTML = '';
+  (fs.data || []).forEach(f => ft.insertAdjacentHTML('beforeend',
+    `<tr><td>${f.fine_id}</td><td>${f.overdue_days}</td><td>¥${Number(f.amount).toFixed(2)}</td>`
+    + `<td>${FINE_STATUS[f.status] || f.status}</td></tr>`));
+
   const rs = await (await fetch('/api/reserve/my')).json();
   const rt = document.getElementById('reserves');
-  rs.data.forEach(r => {
+  rt.innerHTML = '';
+  (rs.data || []).forEach(r => {
     const can = r.status === 'QUEUING' || r.status === 'READY';
+    const reason = r.status === 'REJECTED' && r.reject_reason
+      ? r.reject_reason : '<span class="muted">—</span>';
     rt.insertAdjacentHTML('beforeend',
-      `<tr><td>${r.reservation_id}</td><td>${r.book_id}</td><td>${r.queue_no}</td><td>${r.status}</td>`
-      + `<td>${can ? `<button onclick="cancel(${r.reservation_id})">取消</button>` : '-'}</td></tr>`);
+      `<tr><td>${r.title}</td><td>${r.borrow_days} 天</td><td>${r.queue_no}</td>`
+      + `<td>${RESERVE_STATUS[r.status] || r.status}</td><td>${reason}</td>`
+      + `<td>${can ? `<button class="btn-sm btn-secondary" onclick="cancel(${r.reservation_id})">取消</button>` : '-'}</td></tr>`);
   });
 }
+
 async function renew(id) {
   const r = await fetch('/api/borrow/renew', {method:'POST',headers:{'Content-Type':'application/json'},
     body: JSON.stringify({recordId: id})});
   const d = await r.json();
-  alert(d.msg); if (d.code===0) location.reload();
+  showToast(d.msg, d.code===0?'success':'error');
+  if (d.code===0) load();
 }
+
 async function cancel(id) {
-  const r = await fetch('/api/reserve/cancel', {method:'POST',headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({reservationId: id})});
-  const d = await r.json();
-  alert(d.msg); if (d.code===0) location.reload();
+  showConfirm('确定取消该预约吗？', function () {
+    fetch('/api/reserve/cancel', {method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({reservationId: id})}).then(r=>r.json()).then(d=>{
+      showToast(d.msg, d.code===0?'success':'error');
+      if (d.code===0) load();
+    });
+  });
 }
+
 load();
 </script>
 </body></html>

@@ -67,7 +67,7 @@ class NoticeTest(DbTestCase):
         conn.commit()
         conn.close()
         notice_service.create_notice("测试", "内容", lib)
-        nid = notice_service.list_notices(lib)[0]["id"]
+        nid = notice_service.list_notices(lib)[0]["noticeId"]
         notice_service.mark_read(nid, lib)
         self.assertEqual(notice_service.list_notices(lib)[0]["isRead"], 1)
 

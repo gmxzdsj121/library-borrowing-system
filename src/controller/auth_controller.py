@@ -51,6 +51,15 @@ def handle_change_password(payload, user):
         user["userId"],
         old_password=payload.get("oldPassword"),
         new_password=payload.get("newPassword"),
-        admin_key=payload.get("adminKey"),
     )
     return {"code": 0, "msg": "密码已修改", "data": result}
+
+
+def handle_reset_reader_password(payload, user):
+    result = auth_service.reset_reader_password(
+        operator_id=user["userId"],
+        target_user_id=int(payload["userId"]),
+        new_password=payload.get("newPassword"),
+        admin_key=payload.get("adminKey"),
+    )
+    return {"code": 0, "msg": "读者密码已重置", "data": result}

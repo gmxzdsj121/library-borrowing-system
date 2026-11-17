@@ -8,56 +8,228 @@
 <main class="container">
   <section class="card">
     <h3>新增书目</h3>
-    <p>ISBN：<input id="isbn"> 书名：<input id="title"> 作者：<input id="author"></p>
-    <p>出版社：<input id="publisher"> 出版年份：<input id="year"> 单价：<input id="price"></p>
-    <button onclick="createBook()">新增书目</button>
+    <p>ISBN：<input id="isbn" style="max-width:180px" placeholder="选填">
+       书名：<input id="title" style="max-width:180px" placeholder="必填"></p>
+    <p>作者：<input id="author" style="max-width:140px">
+       出版社：<input id="publisher" style="max-width:160px"></p>
+    <p>出版日期：<input type="date" id="publishDate" style="max-width:160px">
+       分类：<select id="categoryId" style="max-width:140px"><option value="">请选择</option></select></p>
+    <p>馆藏位置：<select id="shelf" style="max-width:140px"><option value="">请选择</option></select>
+       单价：<input id="price" type="number" step="0.01" style="max-width:100px" placeholder="0.00"></p>
+    <button class="btn-primary" onclick="createBook()">新增</button>
+    <button class="btn-secondary" onclick="resetCreateForm()">重置</button>
   </section>
 
   <section class="card">
     <h3>给图书添加复本</h3>
-    <p class="muted">先在下方图书列表中找到要加复本的书，点击"选择"自动填入图书ID，再填写条码和位置。</p>
-    <p>图书ID：<input id="bid"> 条码：<input id="code"> 位置：<input id="loc" value="A区"></p>
-    <button onclick="addCopy()">添加复本</button>
+    <p class="muted">先在下方图书列表点击"加复本"，位置会自动取该书馆藏位置，可手动调整。</p>
+    <p>图书ID：<input id="bid" readonly style="max-width:100px;background:#f0f0f0">
+       条码：<input id="code" style="max-width:160px" placeholder="如 BC51001">
+       位置：<input id="loc" style="max-width:120px" placeholder="自动填入">
+    <button class="btn-primary" onclick="addCopy()">添加复本</button></p>
   </section>
 
   <section class="card">
-    <h3>图书列表（含图书ID）</h3>
+    <h3>图书列表</h3>
+    <p>搜索：<input id="searchKw" placeholder="书名/作者/ISBN" style="max-width:240px">
+    <button class="btn-sm btn-primary" onclick="loadBooks(1)">搜索</button></p>
     <table class="grid">
-      <thead><tr><th>图书ID</th><th>书名</th><th>作者</th><th>ISBN</th><th>可借/总</th><th>操作</th></tr></thead>
+      <thead><tr><th>ID</th><th>书名</th><th>作者</th><th>分类</th><th>位置</th><th>可借/总</th><th>操作</th></tr></thead>
       <tbody id="bookList"></tbody>
     </table>
+    <div id="bookPager" style="margin-top:12px;text-align:center"></div>
   </section>
 </main>
+
+<!-- 编辑图书弹窗 -->
+<div id="editModal" class="modal-mask" style="display:none">
+  <div class="modal-dialog" style="width:520px">
+    <div class="modal-header"><span>编辑图书信息</span><span class="modal-close" onclick="closeEdit()">&times;</span></div>
+    <div class="modal-body">
+      <p>书名：<input id="editTitle" style="max-width:320px"></p>
+      <p>作者：<input id="editAuthor" style="max-width:200px">
+         出版社：<input id="editPublisher" style="max-width:200px"></p>
+      <p>出版日期：<input type="date" id="editPublishDate" style="max-width:180px">
+         分类：<select id="editCategoryId" style="max-width:140px"><option value="">请选择</option></select></p>
+      <p>馆藏位置：<select id="editShelf" style="max-width:140px"><option value="">请选择</option></select>
+         单价：<input id="editPrice" type="number" step="0.01" style="max-width:100px"></p>
+      <p>ISBN：<input id="editIsbn" style="max-width:200px"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveEdit()">保存修改</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
 <script>
-async function loadBooks() {
-  const r = await fetch('/api/book/list');
+const SHELF_OPTIONS = [
+  'A-01','A-02','A-03','A-04','A-05','A-06','A-07','A-08','A-09','A-10',
+  'B-01','B-02','B-03','B-04','B-05','B-06','B-07','B-08','B-09','B-10',
+  'C-01','C-02','C-03','C-04','C-05','C-06','C-07','C-08','C-09','C-10',
+  'D-01','D-02','D-03','D-04','D-05','E-01','E-02','E-03','F-01','F-02','G-01'
+];
+let editingId = null;
+let bookPage = 1;
+const bookPageSize = 10;
+let allBooks = [];
+let bookTotalPages = 1;
+
+async function loadCategories() {
+  const r = await fetch('/api/book/categories');
   const d = await r.json();
-  const rows = d.data.map(b => `<tr><td>${b.bookId}</td><td>${b.title}</td><td>${b.author||''}</td>
-    <td>${b.isbn||''}</td><td>${b.availableCopies}/${b.totalCopies}</td>
-    <td><button onclick="pickBook(${b.bookId}, ${JSON.stringify(b.title).replace(/"/g,'&quot;')})">选择</button></td></tr>`).join('');
-  document.getElementById('bookList').innerHTML = rows;
+  ['categoryId','editCategoryId'].forEach(id => {
+    const sel = document.getElementById(id);
+    (d.data || []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.category_id;
+      opt.textContent = c.name;
+      sel.appendChild(opt);
+    });
+  });
 }
-function pickBook(bid, title) {
+
+function loadShelves() {
+  ['shelf','editShelf'].forEach(id => {
+    const sel = document.getElementById(id);
+    SHELF_OPTIONS.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s; opt.textContent = s;
+      sel.appendChild(opt);
+    });
+  });
+}
+
+async function loadBooks(page) {
+  bookPage = page || 1;
+  if (allBooks.length === 0) {
+    const r = await fetch('/api/book/list');
+    const d = await r.json();
+    allBooks = d.data || [];
+  }
+  const kw = document.getElementById('searchKw').value.trim().toLowerCase();
+  let list = allBooks;
+  if (kw) {
+    list = list.filter(b =>
+      (b.title||'').toLowerCase().includes(kw) ||
+      (b.author||'').toLowerCase().includes(kw) ||
+      (b.isbn||'').toLowerCase().includes(kw));
+  }
+  const total = list.length;
+  const totalPages = Math.ceil(total / bookPageSize) || 1;
+  bookTotalPages = totalPages;
+  if (bookPage > totalPages) bookPage = totalPages;
+  const pageList = list.slice((bookPage-1)*bookPageSize, bookPage*bookPageSize);
+
+  const rows = pageList.map(b => `<tr><td>${b.bookId}</td><td>${b.title}</td><td>${b.author||''}</td>
+    <td>${b.categoryName||'-'}</td><td>${b.shelf||'-'}</td>
+    <td><span class="status-tag ${b.availableCopies>0?'status-success':'status-warn'}">${b.availableCopies}/${b.totalCopies}</span></td>
+    <td>
+      <button class="btn-sm btn-secondary" onclick="pickBook(${b.bookId},'${b.shelf||''}')">加复本</button>
+      <button class="btn-sm btn-primary" onclick="openEdit(${b.bookId})">编辑</button>
+    </td></tr>`).join('');
+  document.getElementById('bookList').innerHTML = rows || '<tr><td colspan="7" class="muted">暂无图书</td></tr>';
+
+  let pager = '';
+  if (bookPage > 1) pager += `<button class="btn-sm btn-secondary" onclick="loadBooks(${bookPage-1})">上一页</button> `;
+  pager += `<span class="muted">第 ${bookPage}/${totalPages} 页（共 ${total} 本）</span> `;
+  if (bookPage < totalPages) pager += `<button class="btn-sm btn-secondary" onclick="loadBooks(${bookPage+1})">下一页</button>`;
+  pager += `　跳至 <input type="number" id="bookJumpPage" min="1" max="${totalPages}" value="${bookPage}" style="width:60px;text-align:center"> 页 <button class="btn-sm btn-primary" onclick="jumpBook()">GO</button>`;
+  document.getElementById('bookPager').innerHTML = pager;
+}
+
+function jumpBook() {
+  const v = parseInt(document.getElementById('bookJumpPage').value);
+  if (v && v >= 1 && v <= bookTotalPages) {
+    loadBooks(v);
+  }
+}
+
+function resetCreateForm() {
+  ['isbn','title','author','publisher','publishDate','price'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('categoryId').value = '';
+  document.getElementById('shelf').value = '';
+}
+
+function openEdit(bid) {
+  const b = allBooks.find(x => x.bookId === bid);
+  if (!b) return;
+  editingId = bid;
+  document.getElementById('editTitle').value = b.title;
+  document.getElementById('editAuthor').value = b.author || '';
+  document.getElementById('editPublisher').value = b.publisher || '';
+  document.getElementById('editPublishDate').value = b.publishDate || '';
+  document.getElementById('editCategoryId').value = b.categoryId || '';
+  document.getElementById('editShelf').value = b.shelf || '';
+  document.getElementById('editPrice').value = b.price;
+  document.getElementById('editIsbn').value = b.isbn || '';
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEdit() {
+  document.getElementById('editModal').style.display = 'none';
+  editingId = null;
+}
+
+async function saveEdit() {
+  const body = {
+    bookId: editingId,
+    title: document.getElementById('editTitle').value.trim(),
+    author: document.getElementById('editAuthor').value.trim(),
+    publisher: document.getElementById('editPublisher').value.trim(),
+    publishDate: document.getElementById('editPublishDate').value,
+    categoryId: document.getElementById('editCategoryId').value || null,
+    shelf: document.getElementById('editShelf').value,
+    price: parseFloat(document.getElementById('editPrice').value) || 0,
+    isbn: document.getElementById('editIsbn').value.trim(),
+  };
+  if (!body.title) { showToast('书名不能为空', 'error'); return; }
+  const r = await fetch('/api/book/update', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  showToast(d.msg, d.code===0?'success':'error');
+  if (d.code===0) { closeEdit(); allBooks = []; loadBooks(bookPage); }
+}
+
+async function createBook() {
+  const title = document.getElementById('title').value.trim();
+  if (!title) { showToast('请填写书名', 'error'); return; }
+  const body = {
+    isbn: document.getElementById('isbn').value.trim(),
+    title: title,
+    author: document.getElementById('author').value.trim(),
+    publisher: document.getElementById('publisher').value.trim(),
+    publishDate: document.getElementById('publishDate').value,
+    categoryId: document.getElementById('categoryId').value || null,
+    shelf: document.getElementById('shelf').value,
+    price: parseFloat(document.getElementById('price').value) || 0,
+  };
+  const r = await fetch('/api/book/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d = await r.json();
+  showToast(d.msg + (d.code===0 ? ' ID='+d.data.bookId : ''), d.code===0?'success':'error');
+  if (d.code===0) { resetCreateForm(); allBooks = []; loadBooks(1); }
+}
+
+function pickBook(bid, shelf) {
   document.getElementById('bid').value = bid;
+  document.getElementById('loc').value = shelf || '';
   document.getElementById('code').value = '';
   document.getElementById('code').focus();
-  alert('已选择《' + title + '》，图书ID=' + bid + '，请填写条码后添加复本');
 }
-async function createBook() {
-  const body = {isbn:document.getElementById('isbn').value, title:document.getElementById('title').value,
-    author:document.getElementById('author').value, publisher:document.getElementById('publisher').value,
-    publishYear:+document.getElementById('year').value, price:+document.getElementById('price').value};
-  const r = await fetch('/api/book/create', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const d = await r.json(); alert(d.msg + (d.code===0?' ID='+d.data.bookId:''));
-  if (d.code===0) loadBooks();
-}
+
 async function addCopy() {
   const body = {bookId:+document.getElementById('bid').value, barcode:document.getElementById('code').value,
     location:document.getElementById('loc').value};
+  if (!body.bookId) { showToast('请先选择图书', 'error'); return; }
+  if (!body.barcode) { showToast('请填写条码', 'error'); return; }
   const r = await fetch('/api/book/add-copy', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const d = await r.json(); alert(d.msg);
-  if (d.code===0) loadBooks();
+  const d = await r.json();
+  showToast(d.msg, d.code===0?'success':'error');
+  if (d.code===0) { allBooks = []; loadBooks(bookPage); }
 }
-loadBooks();
+
+loadCategories();
+loadShelves();
+loadBooks(1);
 </script>
 </body></html>

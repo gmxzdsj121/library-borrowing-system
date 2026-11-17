@@ -57,8 +57,9 @@ def create_book(payload, operator_id):
             title,
             (payload.get("author") or "").strip() or None,
             (payload.get("publisher") or "").strip() or None,
-            payload.get("publishYear"),
-            payload.get("categoryId"),
+            payload.get("publishDate") or None,
+            payload.get("categoryId") or None,
+            (payload.get("shelf") or "").strip() or None,
             float(payload.get("price") or 0),
         )
         user_dao.write_audit(conn, operator_id, "BOOK_CREATE", "book:%d" % book_id,
@@ -72,6 +73,46 @@ def create_book(payload, operator_id):
     except Exception:
         conn.rollback()
         logger.warn("create book failed")
+        raise
+    finally:
+        conn.close()
+
+
+def update_book(book_id, payload, operator_id):
+    """馆员修改图书信息。"""
+    conn = get_conn()
+    try:
+        book = book_dao.get_book(conn, book_id)
+        if not book:
+            raise AuthError("图书不存在", 404)
+        fields = {}
+        if "isbn" in payload:
+            fields["isbn"] = (payload["isbn"] or "").strip() or None
+        if "title" in payload:
+            fields["title"] = (payload["title"] or "").strip()
+        if "author" in payload:
+            fields["author"] = (payload["author"] or "").strip() or None
+        if "publisher" in payload:
+            fields["publisher"] = (payload["publisher"] or "").strip() or None
+        if "publishDate" in payload:
+            fields["publish_date"] = payload["publishDate"] or None
+        if "categoryId" in payload:
+            fields["category_id"] = payload["categoryId"] or None
+        if "shelf" in payload:
+            fields["shelf"] = (payload["shelf"] or "").strip() or None
+        if "price" in payload:
+            fields["price"] = float(payload["price"] or 0)
+        if "status" in payload:
+            fields["status"] = payload["status"]
+        if not fields:
+            raise AuthError("没有可修改的字段")
+        book_dao.update_book(conn, book_id, **fields)
+        user_dao.write_audit(conn, operator_id, "BOOK_UPDATE",
+                             "book:%d" % book_id, str(fields), "")
+        conn.commit()
+        return {"bookId": book_id}
+    except AuthError:
+        conn.rollback()
         raise
     finally:
         conn.close()
@@ -114,8 +155,9 @@ def list_all_books():
     conn = get_conn()
     try:
         rows = conn.execute(
-            "SELECT book_id, isbn, title, author, publisher, publish_year, category_id, "
-            "price, total_copies, available_copies, status FROM book ORDER BY book_id"
+            "SELECT b.*, c.name AS category_name FROM book b "
+            "LEFT JOIN book_category c ON b.category_id = c.category_id "
+            "ORDER BY b.book_id"
         ).fetchall()
         return [_book_dict(r) for r in rows]
     finally:
@@ -123,15 +165,17 @@ def list_all_books():
 
 
 def _book_dict(row):
+    keys = set(row.keys())
     return {
         "bookId": row["book_id"],
         "isbn": row["isbn"] or "",
         "title": row["title"],
         "author": row["author"] or "",
         "publisher": row["publisher"] or "",
-        "publishYear": row["publish_year"],
+        "publishDate": row["publish_date"] or "",
         "categoryId": row["category_id"],
-        "categoryName": row["category_name"] if "category_name" in row.keys() else "",
+        "categoryName": row["category_name"] if "category_name" in keys else "",
+        "shelf": row["shelf"] or "",
         "price": row["price"],
         "totalCopies": row["total_copies"],
         "availableCopies": row["available_copies"],

@@ -7,32 +7,51 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="auth-page">
-<div class="auth-box">
-  <div class="brand">
-    <h1>图书借阅管理系统</h1>
-    <p>Library Borrowing Management System · 迭代一</p>
+<div class="auth-wrapper">
+  <!-- 左侧图文装饰区 -->
+  <div class="auth-left">
+    <div class="auth-decor d1">📚</div>
+    <div class="auth-decor d2">📖</div>
+    <div style="font-size:48px;margin-bottom:16px">📚</div>
+    <h2>图书借阅管理系统</h2>
+    <p>Library Borrowing Management System</p>
+    <p>面向社会图书馆的现代化借阅管理平台，支持图书检索、借阅登记、预约审批、统计报表等完整业务流程。</p>
+    <ul class="auth-features">
+      <li>多角色权限管理：读者 / 馆员 / 管理员</li>
+      <li>图书检索、借阅、归还、续借一站式服务</li>
+      <li>预约审批流程，到书自动提醒</li>
+      <li>逾期罚款自动计算，支持减免审批</li>
+      <li>数据统计与图表可视化</li>
+    </ul>
   </div>
 
-  <form id="loginForm" autocomplete="off">
-    <label for="username">登录名 / 读者证号</label>
-    <input type="text" id="username" name="username" placeholder="请输入登录名" maxlength="20">
+  <!-- 右侧登录表单 -->
+  <div class="auth-box">
+    <div class="brand">
+      <h1>欢迎登录</h1>
+      <p>请输入您的账号信息</p>
+    </div>
 
-    <label for="password">口令</label>
-    <input type="password" id="password" name="password" placeholder="请输入口令" maxlength="32">
+    <form id="loginForm" autocomplete="off">
+      <label for="username">登录名</label>
+      <input type="text" id="username" name="username" placeholder="请输入登录名" maxlength="20">
 
-    <div id="msg" class="msg"></div>
+      <label for="password">口令</label>
+      <input type="password" id="password" name="password" placeholder="请输入口令" maxlength="32">
 
-    <button type="submit" id="btnLogin">登 录</button>
-  </form>
+      <div id="msg" class="msg"></div>
 
-  <div class="foot-link">
-    还没有账号？<a href="/register">读者注册</a>
+      <button type="submit" id="btnLogin">登 录</button>
+    </form>
+
+    <div class="foot-link">
+      还没有账号？<a href="/register">读者注册</a>
+    </div>
+    <div class="hint">演示账号：读者 reader01 / reader123456 &nbsp;·&nbsp; 馆员 libadmin / lib123456 &nbsp;·&nbsp; 管理员 auditor / audit123456</div>
   </div>
-  <div class="hint">演示账号：reader01 / reader123456 &nbsp;·&nbsp; libadmin / lib123456</div>
 </div>
 
 <script>
-  // 页面逻辑比较轻，直接写在这里，暂不拆 js 文件
   const form = document.getElementById('loginForm');
   const msg = document.getElementById('msg');
 

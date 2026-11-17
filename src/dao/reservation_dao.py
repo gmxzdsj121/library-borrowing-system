@@ -32,8 +32,12 @@ def get_reservation(conn, reservation_id):
 
 
 def list_reservations_by_reader(conn, reader_id):
+    """列出读者的所有预约，关联图书表拿到书名和ISBN。"""
     return conn.execute(
-        "SELECT * FROM reservation WHERE reader_id = ? ORDER BY created_at DESC",
+        """SELECT r.*, b.title, b.isbn
+           FROM reservation r
+           JOIN book b ON r.book_id = b.book_id
+           WHERE r.reader_id = ? ORDER BY r.created_at DESC""",
         (reader_id,),
     ).fetchall()
 

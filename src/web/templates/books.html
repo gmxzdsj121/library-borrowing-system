@@ -7,44 +7,91 @@
 <div class="user-area"><a href="/home" class="link-btn">返回首页</a></div></header>
 <main class="container">
   <section class="card">
-    <input id="kw" placeholder="输入书名 / 作者 / ISBN" style="width:60%;padding:8px">
-    <button onclick="search()">检索</button>
+    <p>关键词：<input id="kw" placeholder="书名 / 作者 / ISBN" style="max-width:260px">
+       分类：<select id="cat" style="max-width:140px"><option value="">全部分类</option></select>
+       <button class="btn-primary" onclick="search(1)">检索</button></p>
+    <p class="muted" id="pageInfo"></p>
   </section>
   <section class="card">
     <table class="grid">
-      <thead><tr><th>图书ID</th><th>ISBN</th><th>书名</th><th>作者</th><th>出版社</th><th>可借/总</th><th>操作</th></tr></thead>
+      <thead><tr><th>书名</th><th>作者</th><th>分类</th><th>馆藏位置</th><th>可借/总</th><th>操作</th></tr></thead>
       <tbody id="rows"></tbody>
     </table>
+    <div id="pager" style="margin-top:14px;text-align:center"></div>
   </section>
 </main>
+<script src="/static/common.js"></script>
 <script>
-async function search() {
-  const kw = document.getElementById('kw').value;
-  const r = await fetch('/api/book/search?keyword=' + encodeURIComponent(kw));
+let currentPage = 1;
+const pageSize = 10;
+
+async function loadCategories() {
+  const r = await fetch('/api/book/categories');
   const d = await r.json();
+  const sel = document.getElementById('cat');
+  (d.data || []).forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.category_id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function search(page) {
+  currentPage = page || 1;
+  const kw = document.getElementById('kw').value;
+  const cat = document.getElementById('cat').value;
+  let url = '/api/book/search?page=' + currentPage + '&pageSize=' + pageSize;
+  if (kw) url += '&keyword=' + encodeURIComponent(kw);
+  if (cat) url += '&categoryId=' + cat;
+  const r = await fetch(url);
+  const d = await r.json();
+  const data = d.data || {list:[], total:0};
   const tb = document.getElementById('rows');
   tb.innerHTML = '';
-  for (const b of d.data.list) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${b.bookId}</td><td>${b.isbn||'-'}</td><td>${b.title}</td><td>${b.author||'-'}</td>`
-      + `<td>${b.publisher||'-'}</td><td>${b.availableCopies}/${b.totalCopies}</td>`
-      + `<td><button onclick="doReserve(${b.bookId}, ${b.availableCopies})">预约</button></td>`;
-    tb.appendChild(tr);
+  if (!data.list.length) {
+    tb.innerHTML = '<tr><td colspan="6" class="muted">未找到匹配的图书</td></tr>';
+  } else {
+    data.list.forEach(b => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${b.title}</td><td>${b.author||'-'}</td><td>${b.categoryName||'-'}</td>`
+        + `<td>${b.shelf||'-'}</td>`
+        + `<td><span class="status-tag ${b.availableCopies>0?'status-success':'status-warn'}">${b.availableCopies}/${b.totalCopies}</span></td>`
+        + `<td><button class="btn-sm btn-primary" onclick="doReserve(${b.bookId}, ${b.availableCopies})">预约</button></td>`;
+      tb.appendChild(tr);
+    });
   }
+  // 分页
+  const totalPages = Math.ceil(data.total / pageSize) || 1;
+  document.getElementById('pageInfo').textContent = '共 ' + data.total + ' 本，第 ' + currentPage + '/' + totalPages + ' 页';
+  let pagerHtml = '';
+  if (currentPage > 1) pagerHtml += `<button class="btn-sm btn-secondary" onclick="search(${currentPage-1})">上一页</button> `;
+  if (currentPage < totalPages) pagerHtml += `<button class="btn-sm btn-secondary" onclick="search(${currentPage+1})">下一页</button>`;
+  pagerHtml += `　跳至 <input type="number" id="jumpPage" min="1" max="${totalPages}" value="${currentPage}" style="width:60px;text-align:center"> 页 <button class="btn-sm btn-primary" onclick="jumpTo()">GO</button>`;
+  document.getElementById('pager').innerHTML = pagerHtml;
 }
+
+function jumpTo() {
+  const p = parseInt(document.getElementById('jumpPage').value);
+  if (p >= 1) search(p);
+}
+
 async function doReserve(bookId, available) {
   if (available > 0) {
-    alert('该书有可借复本，请联系馆员办理借阅，无需预约');
+    showToast('该书有可借复本，请联系馆员办理借阅，无需预约', 'info');
     return;
   }
-  const days = prompt('请输入借阅天数（1-60，默认30）：', '30');
-  if (days === null) return;
-  const r = await fetch('/api/reserve', {method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({bookId: bookId, borrowDays: parseInt(days)||30})});
-  const d = await r.json();
-  alert(d.msg);
+  showPrompt('请输入借阅天数（1-60，默认30）：', '30', function(days) {
+    fetch('/api/reserve/reserve', {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bookId: bookId, borrowDays: parseInt(days)||30})})
+      .then(r=>r.json()).then(d=>{
+        showToast(d.msg, d.code===0?'success':'error');
+      });
+  });
 }
-search();
+
+loadCategories();
+search(1);
 </script>
 </body></html>

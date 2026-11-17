@@ -14,19 +14,20 @@
     <div id="list">加载中...</div>
   </section>
 </main>
+<script src="/static/common.js"></script>
 <script>
 async function load() {
   const r = await fetch('/api/reserve/pending');
   if (r.status === 401) { location.href='/login'; return; }
   const d = await r.json();
   if (d.code !== 0) { document.getElementById('list').textContent = d.msg; return; }
-  if (!d.data.length) { document.getElementById('list').innerHTML = '<p>暂无待审批申请</p>'; return; }
+  if (!d.data.length) { document.getElementById('list').innerHTML = '<p class="muted">暂无待审批申请</p>'; return; }
   const rows = d.data.map(x => `
     <tr><td>${x.username}</td><td>${x.real_name||''}</td><td>${x.title}</td>
-      <td>${x.isbn}</td><td>${x.borrow_days} 天</td><td>${x.created_at}</td>
+      <td>${x.isbn||'-'}</td><td>${x.borrow_days} 天</td><td>${x.created_at}</td>
       <td>
-        <button onclick="approve(${x.reservation_id})">通过</button>
-        <button onclick="reject(${x.reservation_id})">拒绝</button>
+        <button class="btn-sm btn-success" onclick="approve(${x.reservation_id})">通过</button>
+        <button class="btn-sm btn-danger" onclick="reject(${x.reservation_id})">拒绝</button>
       </td></tr>`).join('');
   document.getElementById('list').innerHTML =
     `<table class="grid"><tr><th>读者用户名</th><th>姓名</th><th>书名</th><th>ISBN</th><th>申请借阅</th><th>申请时间</th><th>操作</th></tr>${rows}</table>`;
@@ -35,17 +36,18 @@ async function approve(id) {
   const r = await fetch('/api/reserve/approve', {method:'POST',
     headers:{'Content-Type':'application/json'}, body:JSON.stringify({reservationId:id})});
   const d = await r.json();
-  alert(d.msg);
+  showToast(d.msg, d.code===0?'success':'error');
   if (d.code === 0) load();
 }
-async function reject(id) {
-  const reason = prompt('请输入拒绝理由（可选）：');
-  if (reason === null) return;
-  const r = await fetch('/api/reserve/reject', {method:'POST',
-    headers:{'Content-Type':'application/json'}, body:JSON.stringify({reservationId:id, reason})});
-  const d = await r.json();
-  alert(d.msg);
-  if (d.code === 0) load();
+function reject(id) {
+  showPrompt('请输入拒绝理由（可选）：', '', function(reason) {
+    fetch('/api/reserve/reject', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:JSON.stringify({reservationId:id, reason: reason||''})})
+      .then(r=>r.json()).then(d=>{
+        showToast(d.msg, d.code===0?'success':'error');
+        if (d.code === 0) load();
+      });
+  });
 }
 load();
 </script>

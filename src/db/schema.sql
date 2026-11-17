@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS reader_profile (
     user_id      INTEGER NOT NULL UNIQUE,
     reader_no    TEXT    NOT NULL,
     reader_type  TEXT    NOT NULL DEFAULT 'STUDENT'
-                 CHECK (reader_type IN ('STUDENT','TEACHER')),
+                 CHECK (reader_type IN ('ADULT','CHILD','STUDENT','TEACHER')),
     max_borrow   INTEGER NOT NULL DEFAULT 5,             -- 可借上限
     credit_score INTEGER NOT NULL DEFAULT 100,           -- 信用分，欠费/逾期扣分
     created_at   TEXT    NOT NULL,
@@ -81,8 +81,9 @@ CREATE TABLE IF NOT EXISTS book (
     title            TEXT    NOT NULL,
     author           TEXT,
     publisher        TEXT,
-    publish_year     INTEGER,
+    publish_date     TEXT,                      -- 出版日期 YYYY-MM-DD
     category_id      INTEGER,
+    shelf            TEXT,                      -- 馆藏位置（书架号，如 A-01）
     price            REAL    NOT NULL DEFAULT 0,
     total_copies     INTEGER NOT NULL DEFAULT 0,
     available_copies INTEGER NOT NULL DEFAULT 0,

@@ -23,8 +23,14 @@ def handle_renew(payload, user):
     return {"code": 0, "msg": "续借成功", "data": data}
 
 
-def handle_my_borrows(user):
-    data = borrow_service.list_my_borrows(user["userId"])
+def handle_my_borrows(user, query=None):
+    query = query or {}
+    data = borrow_service.list_my_borrows(
+        user["userId"],
+        keyword=query.get("keyword"),
+        page=int(query.get("page", 1)),
+        page_size=int(query.get("pageSize", 10)),
+    )
     return {"code": 0, "msg": "ok", "data": data}
 
 

@@ -12,8 +12,8 @@ from src.db.connection import get_conn
 
 ROLE_NAME = {
     "READER": "读者",
-    "LIBRARIAN": "图书馆管理员",
-    "AUDITOR": "审核统计管理员",
+    "LIBRARIAN": "馆员",
+    "AUDITOR": "管理员",
 }
 
 # 管理员密钥：馆员和审核员可凭此修改读者信息（迭代三新增）
@@ -205,23 +205,16 @@ def update_profile(user_id, real_name=None, phone=None):
         conn.close()
 
 
-def change_password(user_id, old_password, new_password, admin_key=None):
-    """修改密码。需要原密码验证，或管理员密钥（仅馆员/审核员可用）。"""
+def change_password(user_id, old_password, new_password):
+    """修改自己的密码：必须验证原密码。"""
     conn = get_conn()
     try:
         row = user_dao.find_user_by_id(conn, user_id)
         if not row:
             raise AuthError("用户不存在", 404)
 
-        # 管理员密钥校验：仅馆员和审核员可使用
-        if admin_key:
-            if row["role"] not in ("LIBRARIAN", "AUDITOR"):
-                raise AuthError("只有馆员和审核员可使用管理员密钥", 403)
-            if admin_key != ADMIN_KEY:
-                raise AuthError("管理员密钥错误")
-        else:
-            if not old_password or not security.check_password(old_password, row["password_hash"]):
-                raise AuthError("原密码错误")
+        if not old_password or not security.check_password(old_password, row["password_hash"]):
+            raise AuthError("原密码错误")
 
         ok, msg = security.password_strength_ok(new_password)
         if not ok:
@@ -231,5 +224,38 @@ def change_password(user_id, old_password, new_password, admin_key=None):
         conn.commit()
         logger.info("password changed user_id=%d" % user_id)
         return {"userId": user_id}
+    finally:
+        conn.close()
+
+
+def reset_reader_password(operator_id, target_user_id, new_password, admin_key=None):
+    """馆员/管理员帮读者重置密码。需要管理员密钥校验。"""
+    conn = get_conn()
+    try:
+        operator = user_dao.find_user_by_id(conn, operator_id)
+        if not operator:
+            raise AuthError("操作员不存在", 404)
+        if operator["role"] not in ("LIBRARIAN", "AUDITOR"):
+            raise AuthError("只有馆员和管理员可重置读者密码", 403)
+        if admin_key != ADMIN_KEY:
+            raise AuthError("管理员密钥错误")
+
+        target = user_dao.find_user_by_id(conn, target_user_id)
+        if not target:
+            raise AuthError("目标用户不存在", 404)
+        if target["role"] != "READER":
+            raise AuthError("只能重置读者账号的密码")
+
+        ok, msg = security.password_strength_ok(new_password)
+        if not ok:
+            raise AuthError(msg)
+
+        user_dao.change_password(conn, target_user_id, security.make_password(new_password))
+        user_dao.write_audit(conn, operator_id, "RESET_PWD",
+                             "user:%d" % target_user_id, "由馆员/管理员重置", "")
+        conn.commit()
+        logger.info("reader password reset by operator=%d target=%d"
+                    % (operator_id, target_user_id))
+        return {"userId": target_user_id}
     finally:
         conn.close()

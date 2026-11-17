@@ -181,12 +181,51 @@ def _book_id_of(conn, copy_id):
     return book_dao.get_copy(conn, copy_id)["book_id"]
 
 
-def list_my_borrows(reader_user_id):
+def _auto_mark_overdue(conn):
+    """把已过应还日仍为 BORROWED 的记录标记为 OVERDUE。"""
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn.execute(
+        "UPDATE borrow_record SET status = 'OVERDUE' "
+        "WHERE status = 'BORROWED' AND due_at < ?", (now,))
+    conn.commit()
+
+
+def list_my_borrows(reader_user_id, keyword=None, page=1, page_size=10):
+    """读者查看自己的借阅记录，支持按书名/条码搜索和分页。"""
+    page = max(1, int(page))
+    page_size = min(100, max(1, int(page_size)))
     conn = get_conn()
     try:
+        _auto_mark_overdue(conn)
         rp = _reader_of(conn, reader_user_id)
-        rows = borrow_dao.get_borrows_by_reader(conn, rp["reader_id"])
-        return [_borrow_dict(r) for r in rows]
+        where = "WHERE br.reader_id = ?"
+        args = [rp["reader_id"]]
+        if keyword:
+            where += " AND (b.title LIKE ? OR bc.barcode LIKE ?)"
+            kw = "%%%s%%" % keyword
+            args += [kw, kw]
+        total = conn.execute(
+            "SELECT COUNT(*) AS c FROM borrow_record br "
+            "JOIN book_copy bc ON br.copy_id = bc.copy_id "
+            "JOIN book b ON bc.book_id = b.book_id " + where,
+            args,
+        ).fetchone()["c"]
+        rows = conn.execute(
+            """SELECT br.*, bc.barcode, b.title, b.isbn
+               FROM borrow_record br
+               JOIN book_copy bc ON br.copy_id = bc.copy_id
+               JOIN book b ON bc.book_id = b.book_id
+               """ + where + " ORDER BY br.borrow_at DESC LIMIT ? OFFSET ?",
+            args + [page_size, (page - 1) * page_size],
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = _borrow_dict(r)
+            d["barcode"] = r["barcode"]
+            d["title"] = r["title"]
+            d["isbn"] = r["isbn"]
+            result.append(d)
+        return {"list": result, "total": total, "page": page, "pageSize": page_size}
     finally:
         conn.close()
 
@@ -195,6 +234,7 @@ def list_active_borrows_all():
     """馆员查看所有未归还的借阅记录，含读者和图书信息。"""
     conn = get_conn()
     try:
+        _auto_mark_overdue(conn)
         rows = conn.execute(
             """SELECT br.*, u.username, u.real_name, bc.barcode, b.title
                FROM borrow_record br

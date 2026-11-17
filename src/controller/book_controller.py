@@ -22,6 +22,11 @@ def handle_create(payload, user):
     return {"code": 0, "msg": "新增成功", "data": data}
 
 
+def handle_update(book_id, payload, user):
+    data = book_service.update_book(int(book_id), payload, user["userId"])
+    return {"code": 0, "msg": "修改成功", "data": data}
+
+
 def handle_add_copy(payload, user):
     data = book_service.add_copy(
         int(payload["bookId"]), payload["barcode"], payload.get("location", ""))

@@ -7,49 +7,64 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="auth-page">
-<div class="auth-box wide">
-  <div class="brand">
-    <h1>读者注册</h1>
-    <p>注册后即可使用图书检索、借阅与预约服务</p>
+<div class="auth-wrapper">
+  <div class="auth-left">
+    <div class="auth-decor d1">📖</div>
+    <div class="auth-decor d2">📚</div>
+    <div style="font-size:48px;margin-bottom:16px">✍️</div>
+    <h2>加入我们</h2>
+    <p>注册成为图书馆读者，开启您的阅读之旅</p>
+    <ul class="auth-features">
+      <li>免费注册，立即拥有读者账号</li>
+      <li>在线检索馆藏百万图书</li>
+      <li>预约热门图书，到书自动提醒</li>
+      <li>借阅记录、罚款明细一目了然</li>
+    </ul>
   </div>
-
-  <form id="regForm" autocomplete="off">
-    <div class="row2">
-      <div>
-        <label for="username">登录名 / 读者证号</label>
-        <input type="text" id="username" placeholder="4-20 位字母、数字或下划线">
-      </div>
-      <div>
-        <label for="realName">真实姓名</label>
-        <input type="text" id="realName" placeholder="请输入真实姓名" maxlength="20">
-      </div>
+  <div class="auth-box wide">
+    <div class="brand">
+      <h1>读者注册</h1>
+      <p>注册后即可使用图书检索、借阅与预约服务</p>
     </div>
 
-    <div class="row2">
-      <div>
-        <label for="phone">手机号（选填）</label>
-        <input type="text" id="phone" placeholder="用于到期提醒" maxlength="11">
+    <form id="regForm" autocomplete="off">
+      <div class="row2">
+        <div>
+          <label for="username">登录名</label>
+          <input type="text" id="username" placeholder="4-20 位字母、数字或下划线">
+        </div>
+        <div>
+          <label for="realName">真实姓名</label>
+          <input type="text" id="realName" placeholder="请输入真实姓名" maxlength="20">
+        </div>
       </div>
-      <div>
-        <label for="readerType">读者类型</label>
-        <select id="readerType">
-          <option value="STUDENT">学生</option>
-          <option value="TEACHER">教师</option>
-        </select>
+
+      <div class="row2">
+        <div>
+          <label for="phone">手机号（选填）</label>
+          <input type="text" id="phone" placeholder="用于到期提醒" maxlength="11">
+        </div>
+        <div>
+          <label for="readerType">读者类型</label>
+          <select id="readerType">
+            <option value="ADULT">成人读者</option>
+            <option value="CHILD">儿童读者</option>
+          </select>
+        </div>
       </div>
-    </div>
 
-    <label for="password">口令（至少 8 位，含字母和数字）</label>
-    <input type="password" id="password" placeholder="例如 abc12345" maxlength="32">
+      <label for="password">口令（至少 8 位，含字母和数字）</label>
+      <input type="password" id="password" placeholder="例如 abc12345" maxlength="32">
 
-    <label for="password2">确认口令</label>
-    <input type="password" id="password2" placeholder="再次输入口令" maxlength="32">
+      <label for="password2">确认口令</label>
+      <input type="password" id="password2" placeholder="再次输入口令" maxlength="32">
 
-    <div id="msg" class="msg"></div>
-    <button type="submit" id="btnReg">注 册</button>
-  </form>
+      <div id="msg" class="msg"></div>
+      <button type="submit" id="btnReg">注 册</button>
+    </form>
 
-  <div class="foot-link">已有账号？<a href="/login">返回登录</a></div>
+    <div class="foot-link">已有账号？<a href="/login">返回登录</a></div>
+  </div>
 </div>
 
 <script>

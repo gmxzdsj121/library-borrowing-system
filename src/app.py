@@ -16,7 +16,7 @@ from src import config
 from src.common import logger
 from src.controller import (auth_controller, book_controller, borrow_controller,
                              reservation_controller, stats_controller, notice_controller)
-from src.db.connection import ensure_ready
+from src.db.connection import ensure_ready, get_conn
 from src.service import auth_service
 from src.service.auth_service import AuthError
 
@@ -28,6 +28,8 @@ ROLE_RULES = {
     "/api/book/create": ["LIBRARIAN", "AUDITOR"],
     "/api/book/list": ["LIBRARIAN", "AUDITOR"],
     "/api/book/add-copy": ["LIBRARIAN", "AUDITOR"],
+    "/api/book/update": ["LIBRARIAN", "AUDITOR"],
+    "/api/export/borrows": ["LIBRARIAN", "AUDITOR"],
     "/api/borrow/borrow": ["LIBRARIAN"],
     "/api/borrow/return": ["LIBRARIAN"],
     "/api/borrow/renew": ["READER"],
@@ -55,6 +57,7 @@ ROLE_RULES = {
     "/api/auth/password": None,
     "/api/reader/list": ["LIBRARIAN", "AUDITOR"],
     "/api/reader/detail": ["LIBRARIAN", "AUDITOR"],
+    "/api/reader/reset-password": ["LIBRARIAN", "AUDITOR"],
     "/api/borrow/active": ["LIBRARIAN", "AUDITOR"],
     "/api/reserve/pending": ["LIBRARIAN", "AUDITOR"],
     "/api/reserve/approve": ["LIBRARIAN"],
@@ -192,6 +195,10 @@ class LibraryHandler(BaseHTTPRequestHandler):
                 return self._json(200, book_controller.handle_list(user))
             if path == "/api/book/add-copy" and method == "POST":
                 return self._handle_book_add_copy()
+            if path == "/api/book/update" and method == "POST":
+                return self._handle_book_update()
+            if path == "/api/export/borrows" and method == "GET":
+                return self._handle_export_borrows()
 
             if path == "/api/borrow/borrow" and method == "POST":
                 return self._handle_borrow()
@@ -219,20 +226,27 @@ class LibraryHandler(BaseHTTPRequestHandler):
 
             # ---- 迭代三：统计报表 / 通知公告 接口 ----
             if path == "/api/stats/overview" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
                 return self._json(200, stats_controller.handle_overview())
             if path == "/api/stats/trend" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
                 return self._json(200, stats_controller.handle_trend(self._query()))
             if path == "/api/stats/popular" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
                 return self._json(200, stats_controller.handle_popular(self._query()))
             if path == "/api/stats/fine" and method == "GET":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
                 return self._json(200, stats_controller.handle_fine_summary())
 
             if path == "/api/notice/publish" and method == "POST":
-                return self._json(200, notice_controller.handle_publish(self._payload(), self._current_user()))
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, notice_controller.handle_publish(self._read_body(), user))
             if path == "/api/notice/list" and method == "GET":
-                return self._json(200, notice_controller.handle_list(self._current_user()))
+                user = self._require(None)
+                return self._json(200, notice_controller.handle_list(user))
             if path == "/api/notice/read" and method == "POST":
-                return self._json(200, notice_controller.handle_read(self._payload(), self._current_user()))
+                user = self._require(None)
+                return self._json(200, notice_controller.handle_read(self._read_body(), user))
             if path == "/api/notice/update" and method == "POST":
                 return self._handle_notice_update()
             if path == "/api/notice/delete" and method == "POST":
@@ -255,6 +269,9 @@ class LibraryHandler(BaseHTTPRequestHandler):
             if path == "/api/reader/detail" and method == "GET":
                 user = self._require(["LIBRARIAN", "AUDITOR"])
                 return self._json(200, self._handle_reader_detail())
+            if path == "/api/reader/reset-password" and method == "POST":
+                user = self._require(["LIBRARIAN", "AUDITOR"])
+                return self._json(200, auth_controller.handle_reset_reader_password(self._read_body(), user))
 
             if path == "/api/borrow/active" and method == "GET":
                 user = self._require(["LIBRARIAN", "AUDITOR"])
@@ -366,6 +383,43 @@ class LibraryHandler(BaseHTTPRequestHandler):
         result = book_controller.handle_add_copy(self._read_body(), user)
         self._json(200, result)
 
+    def _handle_book_update(self):
+        user = self._require(["LIBRARIAN", "AUDITOR"])
+        body = self._read_body()
+        bid = self._query().get("bookId") or body.get("bookId")
+        result = book_controller.handle_update(bid, body, user)
+        self._json(200, result)
+
+    def _handle_export_borrows(self):
+        """导出所有借阅记录为 CSV 文件。"""
+        self._require(["LIBRARIAN", "AUDITOR"])
+        conn = get_conn()
+        try:
+            rows = conn.execute(
+                """SELECT u.username, u.real_name, b.title, bc.barcode,
+                          br.borrow_at, br.due_at, br.return_at, br.renew_count, br.status
+                   FROM borrow_record br
+                   JOIN reader_profile rp ON br.reader_id = rp.reader_id
+                   JOIN sys_user u ON rp.user_id = u.user_id
+                   JOIN book_copy bc ON br.copy_id = bc.copy_id
+                   JOIN book b ON bc.book_id = b.book_id
+                   ORDER BY br.borrow_at DESC"""
+            ).fetchall()
+        finally:
+            conn.close()
+        status_map = {"BORROWED": "借阅中", "OVERDUE": "已逾期", "RETURNED": "已归还"}
+        lines = ["用户名,姓名,书名,条码,借出时间,应还时间,归还时间,续借次数,状态"]
+        for r in rows:
+            lines.append(",".join([
+                r["username"], r["real_name"] or "", r["title"], r["barcode"],
+                r["borrow_at"], r["due_at"], r["return_at"] or "",
+                str(r["renew_count"]), status_map.get(r["status"], r["status"])
+            ]))
+        csv_body = "\ufeff" + "\n".join(lines)
+        data = csv_body.encode("utf-8")
+        self._send(200, data, "text/csv; charset=utf-8",
+                   [("Content-Disposition", "attachment; filename=borrows.csv")])
+
     # ---- 借阅 / 归还 / 续借 ----
     def _handle_borrow(self):
         user = self._require(["LIBRARIAN"])
@@ -384,7 +438,7 @@ class LibraryHandler(BaseHTTPRequestHandler):
 
     def _handle_my_borrows(self):
         user = self._require(["READER"])
-        result = borrow_controller.handle_my_borrows(user)
+        result = borrow_controller.handle_my_borrows(user, self._query())
         self._json(200, result)
 
     # ---- 罚款 ----

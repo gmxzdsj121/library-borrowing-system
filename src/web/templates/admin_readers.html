@@ -11,46 +11,125 @@
 <main class="container">
   <section class="card">
     <h3>读者列表</h3>
-    <div id="readerList">加载中...</div>
-  </section>
-  <section class="card" id="detailCard" style="display:none">
-    <h3>读者详情</h3>
-    <div id="readerDetail"></div>
+    <p>搜索：<input id="searchKw" placeholder="用户名/姓名" style="max-width:240px">
+    <button class="btn-sm btn-primary" onclick="loadReaders(1)">搜索</button></p>
+    <table class="grid">
+      <thead><tr><th>账号ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>手机号</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="readerList"></tbody>
+    </table>
+    <div id="readerPager" style="margin-top:12px;text-align:center"></div>
   </section>
 </main>
+
+<!-- 读者详情弹窗 -->
+<div id="detailModal" class="modal-mask" style="display:none">
+  <div class="modal-dialog" style="width:480px">
+    <div class="modal-header"><span>读者详情</span><span class="modal-close" onclick="closeDetail()">&times;</span></div>
+    <div class="modal-body" id="readerDetail"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/common.js"></script>
 <script>
-const ROLE_MAP = {READER:'读者', LIBRARIAN:'图书馆管理员', AUDITOR:'审核统计管理员'};
-async function load() {
-  const r = await fetch('/api/reader/list');
-  if (r.status === 401) { location.href='/login'; return; }
-  const d = await r.json();
-  if (d.code !== 0) { document.getElementById('readerList').textContent = d.msg; return; }
-  const rows = d.data.map(r => `<tr><td>${r.user_id}</td><td>${r.username}</td><td>${r.real_name||''}</td>
-    <td>${ROLE_MAP[r.role]||r.role}</td><td>${r.phone||''}</td><td>${r.status}</td>
-    <td><button onclick="showDetail(${r.user_id})">查看</button></td></tr>`).join('');
-  document.getElementById('readerList').innerHTML =
-    `<table class="grid"><tr><th>账号ID</th><th>用户名</th><th>姓名</th><th>角色</th><th>手机号</th><th>状态</th><th>操作</th></tr>${rows}</table>`;
+const ROLE_MAP = {READER:'读者', LIBRARIAN:'馆员', AUDITOR:'管理员'};
+const STATUS_MAP = {ACTIVE:'<span class="status-tag status-normal">正常</span>', FROZEN:'<span class="status-tag status-danger">冻结</span>'};
+const READER_TYPE_MAP = {STUDENT:'学生', TEACHER:'教师', ADULT:'成人', CHILD:'儿童'};
+let currentUid = null;
+let readerPage = 1;
+const readerPageSize = 10;
+let allReaders = [];
+let readerTotalPages = 1;
+
+async function loadReaders(page) {
+  readerPage = page || 1;
+  if (allReaders.length === 0) {
+    const r = await fetch('/api/reader/list');
+    const d = await r.json();
+    allReaders = d.data || [];
+  }
+  const kw = document.getElementById('searchKw').value.trim().toLowerCase();
+  let list = allReaders;
+  if (kw) {
+    list = list.filter(r =>
+      (r.username||'').toLowerCase().includes(kw) ||
+      (r.real_name||'').toLowerCase().includes(kw));
+  }
+  const total = list.length;
+  const totalPages = Math.ceil(total / readerPageSize) || 1;
+  readerTotalPages = totalPages;
+  if (readerPage > totalPages) readerPage = totalPages;
+  const pageList = list.slice((readerPage-1)*readerPageSize, readerPage*readerPageSize);
+
+  const rows = pageList.map(r => `<tr><td>${r.user_id}</td><td>${r.username}</td><td>${r.real_name||''}</td>
+    <td>${ROLE_MAP[r.role]||r.role}</td><td>${r.phone||''}</td><td>${STATUS_MAP[r.status]||r.status}</td>
+    <td><button class="btn-sm btn-primary" onclick="showDetail(${r.user_id})">查看</button></td></tr>`).join('');
+  document.getElementById('readerList').innerHTML = rows || '<tr><td colspan="7" class="muted">暂无读者</td></tr>';
+
+  let pager = '';
+  if (readerPage > 1) pager += `<button class="btn-sm btn-secondary" onclick="loadReaders(${readerPage-1})">上一页</button> `;
+  pager += `<span class="muted">第 ${readerPage}/${totalPages} 页（共 ${total} 人）</span> `;
+  if (readerPage < totalPages) pager += `<button class="btn-sm btn-secondary" onclick="loadReaders(${readerPage+1})">下一页</button>`;
+  pager += `　跳至 <input type="number" id="readerJumpPage" min="1" max="${totalPages}" value="${readerPage}" style="width:60px;text-align:center"> 页 <button class="btn-sm btn-primary" onclick="jumpReader()">GO</button>`;
+  document.getElementById('readerPager').innerHTML = pager;
 }
+
+function jumpReader() {
+  const v = parseInt(document.getElementById('readerJumpPage').value);
+  if (v && v >= 1 && v <= readerTotalPages) {
+    loadReaders(v);
+  }
+}
+
 async function showDetail(uid) {
+  currentUid = uid;
   const r = await fetch('/api/reader/detail?userId='+uid);
   const d = await r.json();
-  if (d.code !== 0) { alert(d.msg); return; }
+  if (d.code !== 0) { showToast(d.msg, 'error'); return; }
   const u = d.data;
-  document.getElementById('detailCard').style.display = 'block';
+  const canReset = u.role === 'READER';
   document.getElementById('readerDetail').innerHTML = `
     <table class="grid">
       <tr><td>账号ID</td><td>${u.user_id}</td></tr>
       <tr><td>用户名</td><td>${u.username}</td></tr>
       <tr><td>姓名</td><td>${u.real_name||''}</td></tr>
+      <tr><td>角色</td><td>${ROLE_MAP[u.role]||u.role}</td></tr>
       <tr><td>读者证号</td><td>${u.reader_no||'—'}</td></tr>
-      <tr><td>读者类型</td><td>${u.reader_type||'—'}</td></tr>
+      <tr><td>读者类型</td><td>${READER_TYPE_MAP[u.reader_type]||u.reader_type||'—'}</td></tr>
       <tr><td>手机号</td><td>${u.phone||'—'}</td></tr>
       <tr><td>信用分</td><td>${u.credit_score}</td></tr>
       <tr><td>在借册数</td><td>${u.activeBorrows||0}</td></tr>
-      <tr><td>未结清罚款</td><td>${u.hasUnpaidFine?'有':'无'}</td></tr>
+      <tr><td>未结清罚款</td><td>${u.hasUnpaidFine?'<span class="status-tag status-danger">有</span>':'<span class="status-tag status-success">无</span>'}</td></tr>
       <tr><td>注册时间</td><td>${u.created_at}</td></tr>
-    </table>`;
+    </table>
+    ${canReset ? `<div style="margin-top:14px;text-align:right">
+      <button class="btn btn-primary" onclick="resetPwd()">重置该读者密码</button>
+    </div>` : ''}`;
+  document.getElementById('detailModal').style.display = 'flex';
 }
-load();
+
+function closeDetail() {
+  document.getElementById('detailModal').style.display = 'none';
+}
+
+function resetPwd() {
+  if (!currentUid) return;
+  showPrompt('请输入新密码（至少8位，含字母和数字）：', '', function(newPwd) {
+    if (!newPwd) return;
+    showPrompt('请输入管理员密钥：', '', function(adminKey) {
+      if (!adminKey) { showToast('请输入管理员密钥', 'error'); return; }
+      fetch('/api/reader/reset-password', {method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({userId: currentUid, newPassword: newPwd, adminKey: adminKey})})
+        .then(r=>r.json()).then(d=>{
+          showToast(d.msg, d.code===0?'success':'error');
+        });
+    });
+  });
+}
+
+loadReaders(1);
 </script>
 </body></html>
